@@ -29,7 +29,7 @@ class AppServiceProvider extends ServiceProvider
         if (config('app.env') === 'production') {
             URL::forceScheme('https');
         }
-        Vite::prefetch(concurrency: 3);
+        // Vite::prefetch(concurrency: 3);
 
         Gate::policy(PurchaseOrder::class, PurchaseOrderPolicy::class);
         Gate::policy(DeliveryNote::class, DeliveryNotePolicy::class);
