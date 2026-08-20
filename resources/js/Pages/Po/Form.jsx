@@ -1,0 +1,672 @@
+import InputError from '@/Components/InputError';
+import InputLabel from '@/Components/InputLabel';
+import PrimaryButton from '@/Components/PrimaryButton';
+import SearchableSelect from '@/Components/SearchableSelect';
+import TextInput from '@/Components/TextInput';
+import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
+import { formatQty, isQtyInput, roundQty, toNum } from '@/utils/qty';
+import { Head, Link, useForm } from '@inertiajs/react';
+
+function emptyItem() {
+    return {
+        item_id: '',
+        qty_ordered: '',
+        ohp_supplier_id: '',
+        schedules: [],
+    };
+}
+
+function pad2(n) {
+    return String(n).padStart(2, '0');
+}
+
+function scheduledTotal(item) {
+    return roundQty((item.schedules || []).reduce((sum, s) => sum + toNum(s.qty), 0));
+}
+
+function remainingQty(item) {
+    return roundQty(toNum(item.qty_ordered) - scheduledTotal(item));
+}
+
+function itemLabel(itemsCatalog, itemId) {
+    const found = itemsCatalog.find((i) => String(i.id) === String(itemId));
+    if (!found) {
+        return 'Item belum dipilih';
+    }
+    return `${found.item_number} — ${found.description}`;
+}
+
+function itemShortLabel(itemsCatalog, itemId) {
+    const found = itemsCatalog.find((i) => String(i.id) === String(itemId));
+    if (!found) {
+        return '—';
+    }
+    return found.item_number;
+}
+
+function defaultOhpForItem(itemsCatalog, itemId) {
+    const found = itemsCatalog.find((i) => String(i.id) === String(itemId));
+    return found?.subcont_ohp_id ? String(found.subcont_ohp_id) : '';
+}
+
+function parseDueMonth(dueDate) {
+    if (!dueDate || !/^\d{4}-\d{2}-\d{2}$/.test(dueDate)) {
+        return null;
+    }
+    const [year, month] = dueDate.split('-').map(Number);
+    const days = new Date(year, month, 0).getDate();
+    return { year, month, days };
+}
+
+function dateForDay(dueMonth, day) {
+    return `${dueMonth.year}-${pad2(dueMonth.month)}-${pad2(day)}`;
+}
+
+function monthTitle(dueMonth) {
+    const label = new Date(dueMonth.year, dueMonth.month - 1, 1).toLocaleDateString('id-ID', {
+        month: 'long',
+        year: 'numeric',
+    });
+    return label;
+}
+
+function rowOhp(item, itemsCatalog) {
+    if (item.ohp_supplier_id) {
+        return String(item.ohp_supplier_id);
+    }
+    const fromSchedule = (item.schedules || []).find((s) => s.ohp_supplier_id)?.ohp_supplier_id;
+    if (fromSchedule) {
+        return String(fromSchedule);
+    }
+    return defaultOhpForItem(itemsCatalog, item.item_id);
+}
+
+function qtyOnDay(item, dueMonth, day) {
+    const date = dateForDay(dueMonth, day);
+    const found = (item.schedules || []).find((s) => s.scheduled_date === date);
+    return found?.qty ?? '';
+}
+
+function mapOrderToForm(order) {
+    if (!order) {
+        return {
+            po_number: '',
+            supplier_rm_id: '',
+            due_date: '',
+            notes: '',
+            items: [emptyItem()],
+        };
+    }
+
+    const schedulesByItem = {};
+    (order.schedules || []).forEach((s) => {
+        if (!schedulesByItem[s.purchase_order_item_id]) {
+            schedulesByItem[s.purchase_order_item_id] = [];
+        }
+        schedulesByItem[s.purchase_order_item_id].push({
+            scheduled_date: s.scheduled_date?.slice(0, 10),
+            qty: s.qty === null || s.qty === undefined ? '' : String(toNum(s.qty)),
+            ohp_supplier_id: s.ohp_supplier_id ? String(s.ohp_supplier_id) : '',
+        });
+    });
+
+    return {
+        po_number: order.po_number,
+        supplier_rm_id: order.supplier_rm_id,
+        due_date: order.due_date?.slice(0, 10),
+        notes: order.notes || '',
+        items: (order.items || []).map((item) => {
+            const schedules = schedulesByItem[item.id] || [];
+            return {
+                item_id: item.item_id,
+                qty_ordered:
+                    item.qty_ordered === null || item.qty_ordered === undefined
+                        ? ''
+                        : String(toNum(item.qty_ordered)),
+                ohp_supplier_id: schedules[0]?.ohp_supplier_id || '',
+                schedules,
+            };
+        }),
+    };
+}
+
+function cleanItemsForSubmit(items) {
+    return items.map(({ ohp_supplier_id, ...item }) => ({
+        ...item,
+        qty_ordered: toNum(item.qty_ordered),
+        schedules: (item.schedules || [])
+            .filter((s) => s.scheduled_date && toNum(s.qty) > 0 && s.ohp_supplier_id)
+            .map((s) => ({
+                ...s,
+                qty: toNum(s.qty),
+            })),
+    }));
+}
+
+export default function Form({ order, suppliersRm, suppliersOhp, items }) {
+    const editing = Boolean(order);
+    const { data, setData, post, put, processing, errors, transform } = useForm(
+        mapOrderToForm(order),
+    );
+
+    transform((form) => ({
+        ...form,
+        items: cleanItemsForSubmit(form.items),
+    }));
+
+    const dueMonth = parseDueMonth(data.due_date);
+    const dayColumns = dueMonth
+        ? Array.from({ length: dueMonth.days }, (_, i) => i + 1)
+        : [];
+
+    const scheduleItems = data.items
+        .map((item, index) => ({ item, index }))
+        .filter(({ item }) => item.item_id && toNum(item.qty_ordered) > 0);
+
+    const mismatchItems = scheduleItems.filter(({ item }) => remainingQty(item) !== 0);
+    const hasMismatch = mismatchItems.length > 0;
+
+    const submit = (e) => {
+        e.preventDefault();
+        if (editing) {
+            put(route('purchase-orders.update', order.id));
+        } else {
+            post(route('purchase-orders.store'));
+        }
+    };
+
+    const updateItem = (index, key, value) => {
+        const next = [...data.items];
+        next[index] = { ...next[index], [key]: value };
+
+        if (key === 'item_id') {
+            const defaultOhp = defaultOhpForItem(items, value);
+            next[index].ohp_supplier_id = defaultOhp;
+            next[index].schedules = (next[index].schedules || []).map((s) => ({
+                ...s,
+                ohp_supplier_id: defaultOhp,
+            }));
+        }
+
+        setData('items', next);
+    };
+
+    const setRowOhp = (itemIndex, ohpSupplierId) => {
+        const next = [...data.items];
+        const item = next[itemIndex];
+        const schedules = (item.schedules || []).map((s) => ({
+            ...s,
+            ohp_supplier_id: ohpSupplierId,
+        }));
+        next[itemIndex] = { ...item, ohp_supplier_id: ohpSupplierId, schedules };
+        setData('items', next);
+    };
+
+    const setDayQty = (itemIndex, day, qty) => {
+        if (!dueMonth) {
+            return;
+        }
+
+        const next = [...data.items];
+        const item = next[itemIndex];
+        const date = dateForDay(dueMonth, day);
+        const ohp = rowOhp(item, items);
+        let schedules = [...(item.schedules || [])];
+        const existingIndex = schedules.findIndex((s) => s.scheduled_date === date);
+
+        if (!qty || toNum(qty) <= 0) {
+            schedules = schedules.filter((s) => s.scheduled_date !== date);
+        } else if (existingIndex >= 0) {
+            schedules[existingIndex] = {
+                ...schedules[existingIndex],
+                qty,
+                ohp_supplier_id: schedules[existingIndex].ohp_supplier_id || ohp,
+            };
+        } else {
+            schedules.push({
+                scheduled_date: date,
+                qty,
+                ohp_supplier_id: ohp,
+            });
+        }
+
+        next[itemIndex] = { ...item, schedules };
+        setData('items', next);
+    };
+
+    const remappingSchedulesToDueMonth = (itemsList, newDueDate) => {
+        const month = parseDueMonth(newDueDate);
+        if (!month) {
+            return itemsList;
+        }
+
+        return itemsList.map((item) => {
+            const byDay = {};
+            (item.schedules || []).forEach((s) => {
+                if (!s.scheduled_date || toNum(s.qty) <= 0) {
+                    return;
+                }
+                const day = Number(s.scheduled_date.slice(8, 10));
+                if (!Number.isFinite(day) || day < 1 || day > month.days) {
+                    return;
+                }
+                byDay[day] = {
+                    scheduled_date: dateForDay(month, day),
+                    qty: s.qty,
+                    ohp_supplier_id:
+                        s.ohp_supplier_id || defaultOhpForItem(items, item.item_id),
+                };
+            });
+            return {
+                ...item,
+                schedules: Object.values(byDay),
+            };
+        });
+    };
+
+    const onDueDateChange = (value) => {
+        setData({
+            ...data,
+            due_date: value,
+            items: remappingSchedulesToDueMonth(data.items, value),
+        });
+    };
+
+    return (
+        <AuthenticatedLayout
+            header={
+                <h2 className="ui-section-title">
+                    {editing ? `Edit Draft ${order.po_number}` : 'Buat Draft PO'}
+                </h2>
+            }
+        >
+            <Head title={editing ? 'Edit PO' : 'Buat PO'} />
+
+            <div className="ui-page">
+                <form onSubmit={submit} className="w-full space-y-4">
+                    <div className="ui-panel animate-fade-up p-5 sm:p-6">
+                        <h3 className="mb-4 font-display font-semibold text-ink">Header PO</h3>
+                        <div className="grid gap-4 md:grid-cols-2">
+                            <div>
+                                <InputLabel value="No. PO" />
+                                <TextInput
+                                    className="mt-1 w-full"
+                                    value={data.po_number}
+                                    onChange={(e) => setData('po_number', e.target.value)}
+                                />
+                                <InputError message={errors.po_number} className="mt-1" />
+                            </div>
+                            <div>
+                                <InputLabel value="Due Date" />
+                                <TextInput
+                                    type="date"
+                                    className="mt-1 w-full"
+                                    value={data.due_date}
+                                    onChange={(e) => onDueDateChange(e.target.value)}
+                                />
+                                <InputError message={errors.due_date} className="mt-1" />
+                                {dueMonth && (
+                                    <p className="mt-1 text-xs text-ink-muted">
+                                        Kolom jadwal memakai bulan{' '}
+                                        <span className="font-medium text-ink-soft">
+                                            {monthTitle(dueMonth)}
+                                        </span>
+                                    </p>
+                                )}
+                            </div>
+                            <div>
+                                <InputLabel value="Supplier Raw Material" />
+                                <select
+                                    className="mt-1 w-full rounded-md border-line"
+                                    value={data.supplier_rm_id}
+                                    onChange={(e) => setData('supplier_rm_id', e.target.value)}
+                                >
+                                    <option value="">Pilih supplier</option>
+                                    {suppliersRm.map((s) => (
+                                        <option key={s.id} value={s.id}>
+                                            {s.code} — {s.name}
+                                        </option>
+                                    ))}
+                                </select>
+                                <InputError message={errors.supplier_rm_id} className="mt-1" />
+                            </div>
+                            <div className="md:col-span-2">
+                                <InputLabel value="Catatan" />
+                                <textarea
+                                    className="mt-1 w-full rounded-md border-line"
+                                    rows={2}
+                                    value={data.notes}
+                                    onChange={(e) => setData('notes', e.target.value)}
+                                />
+                            </div>
+                        </div>
+                        <p className="mt-3 text-xs text-ink-muted">
+                            Tujuan OHP diisi per baris part di jadwal pengiriman, sehingga satu PO
+                            bisa mengirim ke beberapa supplier OHP.
+                        </p>
+                    </div>
+
+                    {/* Section 1: Item + Qty */}
+                    <div className="ui-panel p-5 sm:p-6">
+                        <div className="mb-1 flex items-center gap-2">
+                            <span className="inline-flex h-6 w-6 items-center justify-center rounded-md bg-brand text-xs font-bold text-white shadow-sm">
+                                1
+                            </span>
+                            <h3 className="font-display font-semibold text-ink">Item Order & Qty</h3>
+                        </div>
+                        <p className="mb-5 text-sm text-ink-muted">
+                            Isi item dan qty order terlebih dahulu. Subcont (OHP) default item akan
+                            dipakai sebagai tujuan jadwal.
+                        </p>
+
+                        <div className="space-y-4">
+                            {data.items.map((item, itemIndex) => (
+                                <div
+                                    key={itemIndex}
+                                    className="grid gap-3 rounded-lg border border-line bg-canvas-soft p-4 md:grid-cols-[1fr_180px_auto]"
+                                >
+                                    <div>
+                                        <InputLabel value="Item Number" />
+                                        <SearchableSelect
+                                            options={items}
+                                            value={item.item_id}
+                                            placeholder="Ketik item number / deskripsi..."
+                                            getOptionValue={(i) => String(i.id)}
+                                            getOptionLabel={(i) =>
+                                                `${i.item_number} — ${i.description}`
+                                            }
+                                            onChange={(val) =>
+                                                updateItem(itemIndex, 'item_id', val)
+                                            }
+                                        />
+                                        <InputError
+                                            message={errors[`items.${itemIndex}.item_id`]}
+                                            className="mt-1"
+                                        />
+                                    </div>
+                                    <div>
+                                        <InputLabel value="Qty Order (kg)" />
+                                        <TextInput
+                                            type="text"
+                                            inputMode="numeric"
+                                            className="mt-1 w-full"
+                                            value={item.qty_ordered}
+                                            onChange={(e) => {
+                                                if (isQtyInput(e.target.value)) {
+                                                    updateItem(
+                                                        itemIndex,
+                                                        'qty_ordered',
+                                                        e.target.value,
+                                                    );
+                                                }
+                                            }}
+                                        />
+                                        <InputError
+                                            message={errors[`items.${itemIndex}.qty_ordered`]}
+                                            className="mt-1"
+                                        />
+                                    </div>
+                                    <div className="flex items-end">
+                                        {data.items.length > 1 && (
+                                            <button
+                                                type="button"
+                                                className="pb-2 text-sm text-rose-600"
+                                                onClick={() =>
+                                                    setData(
+                                                        'items',
+                                                        data.items.filter(
+                                                            (_, i) => i !== itemIndex,
+                                                        ),
+                                                    )
+                                                }
+                                            >
+                                                Hapus
+                                            </button>
+                                        )}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+
+                        <button
+                            type="button"
+                            className="pressable text-sm font-semibold text-brand hover:text-brand-deep"
+                            onClick={() => setData('items', [...data.items, emptyItem()])}
+                        >
+                            + Tambah item
+                        </button>
+                        <InputError message={errors.items} className="mt-1" />
+                    </div>
+
+                    {/* Section 2: Delivery Schedule Matrix */}
+                    <div className="ui-panel p-5 sm:p-6">
+                        <div className="mb-1 flex flex-wrap items-center justify-between gap-3">
+                            <div className="flex items-center gap-2">
+                                <span className="inline-flex h-6 w-6 items-center justify-center rounded-md bg-brand text-xs font-bold text-white shadow-sm">
+                                    2
+                                </span>
+                                <h3 className="font-display font-semibold text-ink">Jadwal Pengiriman</h3>
+                            </div>
+                            {dueMonth && (
+                                <span className="rounded-md bg-brand-muted px-3 py-1 text-sm font-medium text-brand-deep">
+                                    {monthTitle(dueMonth)} · tgl 1–{dueMonth.days}
+                                </span>
+                            )}
+                        </div>
+                        <p className="mb-5 text-sm text-ink-muted">
+                            Isi qty (kg, bilangan bulat) di cell tanggal yang diinginkan. Baris = part order, kolom =
+                            tanggal dalam bulan due date. Kondisi ideal: sisa qty = 0.
+                        </p>
+
+                        {hasMismatch && scheduleItems.length > 0 && dueMonth && (
+                            <div className="mb-5 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                                <p className="font-medium">
+                                    Qty jadwal belum cocok dengan qty order.
+                                </p>
+                                <ul className="mt-1 list-disc space-y-0.5 pl-5">
+                                    {mismatchItems.map(({ item, index }) => {
+                                        const left = remainingQty(item);
+                                        return (
+                                            <li key={index}>
+                                                {itemLabel(items, item.item_id)} — sisa{' '}
+                                                <span className="font-semibold">
+                                                    {formatQty(left)} kg
+                                                </span>
+                                                {left > 0
+                                                    ? ' belum dialokasikan'
+                                                    : ' kelebihan alokasi'}
+                                            </li>
+                                        );
+                                    })}
+                                </ul>
+                            </div>
+                        )}
+
+                        {!dueMonth ? (
+                            <div className="rounded-lg border border-dashed border-line bg-canvas-soft px-4 py-8 text-center text-sm text-ink-muted">
+                                Pilih due date di header PO terlebih dahulu. Bulan due date menentukan
+                                kolom tanggal (1–31).
+                            </div>
+                        ) : scheduleItems.length === 0 ? (
+                            <div className="rounded-lg border border-dashed border-line bg-canvas-soft px-4 py-8 text-center text-sm text-ink-muted">
+                                Isi item dan qty di section 1 terlebih dahulu untuk mulai mengisi
+                                jadwal pengiriman.
+                            </div>
+                        ) : (
+                            <div className="-mx-2 overflow-x-auto rounded-lg border border-line">
+                                <table className="min-w-full border-collapse text-sm">
+                                    <thead>
+                                        <tr className="bg-canvas text-ink-soft">
+                                            <th className="sticky left-0 z-20 w-[200px] min-w-[200px] max-w-[200px] border-b border-r border-line bg-canvas px-3 py-2 text-left font-semibold shadow-[2px_0_4px_-2px_rgba(0,0,0,0.08)]">
+                                                Part
+                                            </th>
+                                            <th className="sticky left-[200px] z-20 w-[190px] min-w-[190px] max-w-[190px] border-b border-r border-line bg-canvas px-2 py-2 text-left font-semibold shadow-[2px_0_4px_-2px_rgba(0,0,0,0.08)]">
+                                                Tujuan OHP
+                                            </th>
+                                            <th className="min-w-[88px] border-b border-r border-line px-2 py-2 text-right font-semibold">
+                                                Order
+                                            </th>
+                                            <th className="min-w-[88px] border-b border-r border-line px-2 py-2 text-right font-semibold">
+                                                Terjadwal
+                                            </th>
+                                            <th className="min-w-[72px] border-b border-r border-line px-2 py-2 text-right font-semibold">
+                                                Sisa
+                                            </th>
+                                            {dayColumns.map((day) => (
+                                                <th
+                                                    key={day}
+                                                    className="min-w-[52px] border-b border-line px-1 py-2 text-center font-semibold tabular-nums"
+                                                >
+                                                    {day}
+                                                </th>
+                                            ))}
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {scheduleItems.map(({ item, index: itemIndex }, rowIdx) => {
+                                            const ordered = toNum(item.qty_ordered);
+                                            const scheduled = scheduledTotal(item);
+                                            const remaining = remainingQty(item);
+                                            const matched = remaining === 0;
+                                            const ohpValue = rowOhp(item, items);
+                                            const zebra = rowIdx % 2 === 0 ? 'bg-surface' : 'bg-canvas-soft/80';
+
+                                            return (
+                                                <tr key={itemIndex} className={zebra}>
+                                                    <td
+                                                        className={`sticky left-0 z-10 w-[200px] min-w-[200px] max-w-[200px] border-b border-r border-line px-3 py-2 align-middle shadow-[2px_0_4px_-2px_rgba(0,0,0,0.06)] ${zebra}`}
+                                                    >
+                                                        <div
+                                                            className="font-medium text-ink"
+                                                            title={itemLabel(items, item.item_id)}
+                                                        >
+                                                            {itemShortLabel(items, item.item_id)}
+                                                        </div>
+                                                        <div className="mt-0.5 max-w-[176px] truncate text-xs text-ink-muted">
+                                                            {items.find(
+                                                                (i) =>
+                                                                    String(i.id) ===
+                                                                    String(item.item_id),
+                                                            )?.description || ''}
+                                                        </div>
+                                                        <InputError
+                                                            message={
+                                                                errors[`items.${itemIndex}.schedules`]
+                                                            }
+                                                            className="mt-1"
+                                                        />
+                                                    </td>
+                                                    <td
+                                                        className={`sticky left-[200px] z-10 w-[190px] min-w-[190px] max-w-[190px] border-b border-r border-line px-2 py-1.5 align-middle shadow-[2px_0_4px_-2px_rgba(0,0,0,0.06)] ${zebra}`}
+                                                    >
+                                                        <select
+                                                            className="w-full rounded-md border-line py-1.5 text-xs"
+                                                            value={ohpValue}
+                                                            onChange={(e) =>
+                                                                setRowOhp(itemIndex, e.target.value)
+                                                            }
+                                                        >
+                                                            <option value="">Pilih OHP</option>
+                                                            {suppliersOhp.map((s) => (
+                                                                <option key={s.id} value={s.id}>
+                                                                    {s.code} — {s.name}
+                                                                </option>
+                                                            ))}
+                                                        </select>
+                                                    </td>
+                                                    <td className="border-b border-r border-line px-2 py-2 text-right tabular-nums text-ink-soft">
+                                                        {formatQty(ordered)}
+                                                    </td>
+                                                    <td className="border-b border-r border-line px-2 py-2 text-right tabular-nums text-ink-soft">
+                                                        {formatQty(scheduled)}
+                                                    </td>
+                                                    <td
+                                                        className={`border-b border-r border-line px-2 py-2 text-right font-semibold tabular-nums ${
+                                                            matched
+                                                                ? 'text-emerald-700'
+                                                                : remaining > 0
+                                                                  ? 'text-amber-700'
+                                                                  : 'text-rose-700'
+                                                        }`}
+                                                    >
+                                                        {formatQty(remaining)}
+                                                    </td>
+                                                    {dayColumns.map((day) => {
+                                                        const cellQty = qtyOnDay(
+                                                            item,
+                                                            dueMonth,
+                                                            day,
+                                                        );
+                                                        const filled = toNum(cellQty) > 0;
+
+                                                        return (
+                                                            <td
+                                                                key={day}
+                                                                className="border-b border-line p-0.5 align-middle"
+                                                            >
+                                                                <input
+                                                                    type="text"
+                                                                    inputMode="numeric"
+                                                                    autoComplete="off"
+                                                                    aria-label={`Qty ${itemShortLabel(items, item.item_id)} tanggal ${day}`}
+                                                                    className={`no-spin w-full rounded border px-1 py-1.5 text-center text-xs tabular-nums focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand ${
+                                                                        filled
+                                                                            ? 'border-brand-line bg-brand-muted font-medium text-brand-deep'
+                                                                            : 'border-transparent bg-transparent text-ink hover:border-line hover:bg-surface'
+                                                                    }`}
+                                                                    value={
+                                                                        cellQty === null ||
+                                                                        cellQty === undefined
+                                                                            ? ''
+                                                                            : String(cellQty)
+                                                                    }
+                                                                    onChange={(e) => {
+                                                                        if (isQtyInput(e.target.value)) {
+                                                                            setDayQty(
+                                                                                itemIndex,
+                                                                                day,
+                                                                                e.target.value,
+                                                                            );
+                                                                        }
+                                                                    }}
+                                                                    onFocus={(e) => e.target.select()}
+                                                                />
+                                                            </td>
+                                                        );
+                                                    })}
+                                                </tr>
+                                            );
+                                        })}
+                                    </tbody>
+                                </table>
+                            </div>
+                        )}
+
+                        {dueMonth && scheduleItems.length > 0 && (
+                            <p className="mt-3 text-xs text-ink-muted">
+                                Tip: klik cell lalu ketik qty. Cell terisi akan berwarna hijau muda.
+                                Geser horizontal untuk melihat tanggal lain. Kolom Part & OHP tetap
+                                terlihat saat scroll.
+                            </p>
+                        )}
+                    </div>
+
+                    <div className="flex justify-end gap-3">
+                        <Link
+                            href={route('purchase-orders.index')}
+                            className="rounded-md border border-line px-4 py-2 text-sm"
+                        >
+                            Batal
+                        </Link>
+                        <PrimaryButton
+                            disabled={processing}
+                            className=""
+                        >
+                            {editing ? 'Simpan Perubahan' : 'Simpan Draft'}
+                        </PrimaryButton>
+                    </div>
+                </form>
+            </div>
+        </AuthenticatedLayout>
+    );
+}
