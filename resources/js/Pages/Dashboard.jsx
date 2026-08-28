@@ -169,7 +169,13 @@ export default function Dashboard({
                                                 {ohpLabels(po) || '—'}
                                             </td>
                                             <td className="px-5 py-3">
-                                                <StatusBadge type="po" value={po.status} />
+                                                <div className="flex flex-wrap items-center gap-1.5">
+                                                    <StatusBadge type="po" value={po.status} />
+                                                    <StatusBadge
+                                                        type="fulfillment"
+                                                        value={po.is_closed ? 'closed' : 'open'}
+                                                    />
+                                                </div>
                                             </td>
                                         </tr>
                                     ))}
@@ -310,12 +316,22 @@ export default function Dashboard({
                                                                                         kg
                                                                                     </td>
                                                                                     <td className="px-4 py-2">
-                                                                                        <StatusBadge
-                                                                                            type="po"
-                                                                                            value={
-                                                                                                po.status
-                                                                                            }
-                                                                                        />
+                                                                                        <div className="flex flex-wrap items-center gap-1.5">
+                                                                                            <StatusBadge
+                                                                                                type="po"
+                                                                                                value={
+                                                                                                    po.status
+                                                                                                }
+                                                                                            />
+                                                                                            <StatusBadge
+                                                                                                type="fulfillment"
+                                                                                                value={
+                                                                                                    po.is_closed
+                                                                                                        ? 'closed'
+                                                                                                        : 'open'
+                                                                                                }
+                                                                                            />
+                                                                                        </div>
                                                                                     </td>
                                                                                 </tr>
                                                                             ),

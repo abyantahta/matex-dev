@@ -8,6 +8,8 @@ export default function SearchableSelect({
     getOptionLabel = (o) => o.label,
     getOptionValue = (o) => String(o.value),
     className = '',
+    autoFocus = false,
+    focusToken = 0,
 }) {
     const [open, setOpen] = useState(false);
     const [query, setQuery] = useState('');
@@ -34,6 +36,15 @@ export default function SearchableSelect({
             setQuery('');
         }
     }, [open]);
+
+    useEffect(() => {
+        if (!autoFocus) {
+            return undefined;
+        }
+        setOpen(true);
+        const timer = setTimeout(() => inputRef.current?.focus(), 0);
+        return () => clearTimeout(timer);
+    }, [autoFocus, focusToken]);
 
     useEffect(() => {
         const onDocClick = (e) => {

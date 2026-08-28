@@ -28,4 +28,15 @@ enum ScheduleStatus: string
             self::Received => 'emerald',
         };
     }
+
+    /** DN sudah dikirim dan sudah di-approve OHP (atau sudah received PPIC). */
+    public function isSentAndApproved(): bool
+    {
+        return $this === self::OhpOk || $this === self::Received;
+    }
+
+    public static function sentAndApprovedValues(): array
+    {
+        return [self::OhpOk->value, self::Received->value];
+    }
 }

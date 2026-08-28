@@ -6,7 +6,6 @@ use App\Actions\DeliveryNote\ConfirmByOhp;
 use App\Actions\DeliveryNote\ConfirmShipment;
 use App\Actions\DeliveryNote\GenerateDns;
 use App\Enums\ScheduleStatus;
-use App\Enums\UserRole;
 use App\Http\Requests\ConfirmOhpRequest;
 use App\Http\Requests\GenerateDnRequest;
 use App\Http\Requests\UpdateDnDeliveryDateRequest;
@@ -25,6 +24,7 @@ class DeliveryNoteController extends Controller
         $user = $request->user();
 
         $notes = DeliveryNote::query()
+            ->visibleTo($user)
             ->with([
                 'purchaseOrder.supplierRm',
                 'purchaseOrderItem.item',
@@ -32,14 +32,6 @@ class DeliveryNoteController extends Controller
                 'ohpConfirmation',
                 'receiving',
             ])
-            ->when($user->hasRole(UserRole::SupplierRm), fn ($q) => $q->whereHas(
-                'purchaseOrder',
-                fn ($pq) => $pq->where('supplier_rm_id', $user->company_id)
-            ))
-            ->when($user->hasRole(UserRole::SupplierOhp), fn ($q) => $q->whereHas(
-                'deliverySchedule',
-                fn ($sq) => $sq->where('ohp_supplier_id', $user->company_id)
-            ))
             ->when(
                 $request->string('status')->isNotEmpty(),
                 fn ($q) => $q->whereHas('deliverySchedule', fn ($sq) => $sq->where('status', $request->string('status')))

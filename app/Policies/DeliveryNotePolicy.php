@@ -18,11 +18,13 @@ class DeliveryNotePolicy
         }
 
         if ($user->hasRole(UserRole::SupplierRm)) {
-            return $po->supplier_rm_id === $user->company_id;
+            return $user->company_id
+                && (int) $po->supplier_rm_id === (int) $user->company_id;
         }
 
         if ($user->hasRole(UserRole::SupplierOhp)) {
-            return $deliveryNote->deliverySchedule?->ohp_supplier_id === $user->company_id;
+            return $user->company_id
+                && (int) $deliveryNote->deliverySchedule?->ohp_supplier_id === (int) $user->company_id;
         }
 
         return false;
@@ -37,14 +39,16 @@ class DeliveryNotePolicy
     public function updateDeliveryDate(User $user, DeliveryNote $deliveryNote): bool
     {
         return $user->hasRole(UserRole::SupplierRm)
-            && $deliveryNote->purchaseOrder->supplier_rm_id === $user->company_id
+            && $user->company_id
+            && (int) $deliveryNote->purchaseOrder->supplier_rm_id === (int) $user->company_id
             && $deliveryNote->deliverySchedule?->status === ScheduleStatus::Planned;
     }
 
     public function confirmShipment(User $user, DeliveryNote $deliveryNote): bool
     {
         return $user->hasRole(UserRole::SupplierRm)
-            && $deliveryNote->purchaseOrder->supplier_rm_id === $user->company_id
+            && $user->company_id
+            && (int) $deliveryNote->purchaseOrder->supplier_rm_id === (int) $user->company_id
             && $deliveryNote->deliverySchedule->status === ScheduleStatus::Planned
             && (filled($deliveryNote->rm_sj_number)
                 || filled($deliveryNote->deliverySchedule?->rm_sj_number));
@@ -53,7 +57,8 @@ class DeliveryNotePolicy
     public function confirmAsOhp(User $user, DeliveryNote $deliveryNote): bool
     {
         return $user->hasRole(UserRole::SupplierOhp)
-            && $deliveryNote->deliverySchedule?->ohp_supplier_id === $user->company_id
+            && $user->company_id
+            && (int) $deliveryNote->deliverySchedule?->ohp_supplier_id === (int) $user->company_id
             && $deliveryNote->deliverySchedule->status === ScheduleStatus::ShipConfirmed
             && $deliveryNote->ohpConfirmation === null;
     }

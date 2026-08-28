@@ -8,6 +8,7 @@ use App\Actions\PurchaseOrder\RejectByPurchasing;
 use App\Actions\PurchaseOrder\StorePurchaseOrder;
 use App\Actions\PurchaseOrder\SubmitPurchaseOrder;
 use App\Actions\PurchaseOrder\UpdatePurchaseOrder;
+use App\Enums\ScheduleStatus;
 use App\Enums\UserRole;
 use App\Http\Requests\ConfirmByRmRequest;
 use App\Http\Requests\RejectPurchaseOrderRequest;
@@ -30,19 +31,15 @@ class PurchaseOrderController extends Controller
         $user = $request->user();
 
         $orders = PurchaseOrder::query()
-            ->with(['supplierRm', 'creator', 'schedules.ohpSupplier'])
-            ->when($user->hasRole(UserRole::SupplierRm), fn ($q) => $q->where('supplier_rm_id', $user->company_id))
-            ->when(
-                $user->hasRole(UserRole::SupplierOhp),
-                fn ($q) => $q->whereHas(
-                    'schedules',
-                    fn ($sq) => $sq->where('ohp_supplier_id', $user->company_id)
-                )
-            )
+            ->visibleTo($user)
+            ->withFulfillmentCounts()
+            ->with(['supplierRm', 'creator'])
+            ->withSchedulesVisibleTo($user)
             ->when($request->string('status')->isNotEmpty(), fn ($q) => $q->where('status', $request->string('status')))
             ->latest()
             ->paginate(15)
-            ->withQueryString();
+            ->withQueryString()
+            ->through(fn (PurchaseOrder $po) => tap($po)->append('is_closed'));
 
         return Inertia::render('Po/Index', [
             'orders' => $orders,
@@ -79,20 +76,44 @@ class PurchaseOrderController extends Controller
     {
         $this->authorize('view', $purchaseOrder);
 
+        $user = $request->user();
+        $isOhp = $user->hasRole(UserRole::SupplierOhp);
+
         $purchaseOrder->load([
             'supplierRm',
             'creator',
             'items.item.subcontOhp',
+            'schedules' => function ($q) use ($isOhp, $user) {
+                if ($isOhp && $user->company_id) {
+                    $q->where('ohp_supplier_id', $user->company_id);
+                }
+            },
             'schedules.ohpSupplier',
             'schedules.purchaseOrderItem.item',
             'schedules.deliveryNote.ohpConfirmation',
             'schedules.deliveryNote.receiving',
+            'deliveryNotes' => function ($q) use ($isOhp, $user) {
+                if ($isOhp && $user->company_id) {
+                    $q->whereHas(
+                        'deliverySchedule',
+                        fn ($sq) => $sq->where('ohp_supplier_id', $user->company_id)
+                    );
+                }
+            },
             'deliveryNotes.purchaseOrderItem.item',
             'deliveryNotes.deliverySchedule.ohpSupplier',
             'statusLogs.user',
         ]);
 
-        $isOhp = $request->user()->hasRole(UserRole::SupplierOhp);
+        $purchaseOrder->loadCount([
+            'schedules',
+            'schedules as unapproved_schedules_count' => fn ($q) => $q->whereNotIn(
+                'status',
+                ScheduleStatus::sentAndApprovedValues()
+            ),
+        ]);
+        $purchaseOrder->append('is_closed');
+        $purchaseOrder->restrictRelationsFor($user);
 
         // OHP tidak melihat history internal SDI ↔ Supplier RM
         if ($isOhp) {

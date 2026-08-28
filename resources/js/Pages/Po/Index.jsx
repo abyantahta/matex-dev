@@ -13,6 +13,20 @@ function ohpLabels(po) {
     ].join(', ');
 }
 
+function FulfillmentBadge({ po }) {
+    return (
+        <StatusBadge
+            type="fulfillment"
+            value={po.is_closed ? 'closed' : 'open'}
+            title={
+                po.is_closed
+                    ? 'Seluruh DN sudah dikirim dan sudah di-approve'
+                    : 'Masih ada DN yang belum dikirim atau belum di-approve'
+            }
+        />
+    );
+}
+
 export default function Index({ orders, filters }) {
     const { auth } = usePage().props;
     const canCreate = ['purchasing', 'admin'].includes(auth.user.role);
@@ -79,13 +93,21 @@ export default function Index({ orders, filters }) {
                                     <th className="px-4 py-3">OHP</th>
                                     <th className="px-4 py-3">Due Date</th>
                                     <th className="px-4 py-3">Status</th>
-                                    <th className="px-4 py-3" />
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-line">
                                 {orders.data.map((po) => (
-                                    <tr key={po.id} className="ui-row">
-                                        <td className="px-4 py-3 font-semibold text-ink">
+                                    <tr
+                                        key={po.id}
+                                        className="ui-row cursor-pointer"
+                                        title="Klik baris untuk melihat detail PO"
+                                        onClick={() =>
+                                            router.visit(
+                                                route('purchase-orders.show', po.id),
+                                            )
+                                        }
+                                    >
+                                        <td className="px-4 py-3 font-semibold text-brand">
                                             {po.po_number}
                                         </td>
                                         <td className="px-4 py-3 text-ink-soft">
@@ -98,15 +120,10 @@ export default function Index({ orders, filters }) {
                                             {new Date(po.due_date).toLocaleDateString('id-ID')}
                                         </td>
                                         <td className="px-4 py-3">
-                                            <StatusBadge type="po" value={po.status} />
-                                        </td>
-                                        <td className="px-4 py-3 text-right">
-                                            <Link
-                                                href={route('purchase-orders.show', po.id)}
-                                                className="ui-link"
-                                            >
-                                                Detail
-                                            </Link>
+                                            <div className="flex flex-wrap items-center gap-1.5">
+                                                <StatusBadge type="po" value={po.status} />
+                                                <FulfillmentBadge po={po} />
+                                            </div>
                                         </td>
                                     </tr>
                                 ))}

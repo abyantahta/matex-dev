@@ -2,7 +2,7 @@ import EmptyState from '@/Components/EmptyState';
 import StatusBadge from '@/Components/StatusBadge';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { formatQty } from '@/utils/qty';
-import { Head, Link, router } from '@inertiajs/react';
+import { Head, router } from '@inertiajs/react';
 
 export default function Index({ notes, filters, scheduleStatuses }) {
     return (
@@ -54,13 +54,21 @@ export default function Index({ notes, filters, scheduleStatuses }) {
                                         <th className="px-4 py-3">Qty</th>
                                         <th className="px-4 py-3">Jadwal</th>
                                         <th className="px-4 py-3">Status</th>
-                                        <th className="px-4 py-3"></th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-line">
                                     {notes.data.map((note) => (
-                                        <tr key={note.id} className="hover:bg-canvas-soft">
-                                            <td className="px-4 py-3 font-medium">
+                                        <tr
+                                            key={note.id}
+                                            className="ui-row cursor-pointer"
+                                            title="Klik baris untuk melihat detail DN"
+                                            onClick={() =>
+                                                router.visit(
+                                                    route('delivery-notes.show', note.id),
+                                                )
+                                            }
+                                        >
+                                            <td className="px-4 py-3 font-semibold text-brand">
                                                 {note.dn_number}
                                             </td>
                                             <td className="px-4 py-3">
@@ -80,14 +88,6 @@ export default function Index({ notes, filters, scheduleStatuses }) {
                                                     type="schedule"
                                                     value={note.delivery_schedule?.status}
                                                 />
-                                            </td>
-                                            <td className="px-4 py-3 text-right">
-                                                <Link
-                                                    href={route('delivery-notes.show', note.id)}
-                                                    className="font-medium text-brand hover:underline"
-                                                >
-                                                    Detail
-                                                </Link>
                                             </td>
                                         </tr>
                                     ))}

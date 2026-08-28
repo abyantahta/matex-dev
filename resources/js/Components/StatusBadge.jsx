@@ -31,17 +31,29 @@ const QAD_STATUS = {
     failed: { label: 'QAD Gagal', color: 'rose' },
 };
 
+const FULFILLMENT_STATUS = {
+    open: { label: 'Open', color: 'amber' },
+    closed: { label: 'Closed', color: 'emerald' },
+};
+
 export function resolveStatus(type, value) {
     const map =
-        type === 'po' ? PO_STATUS : type === 'schedule' ? SCHEDULE_STATUS : QAD_STATUS;
+        type === 'po'
+            ? PO_STATUS
+            : type === 'schedule'
+              ? SCHEDULE_STATUS
+              : type === 'fulfillment'
+                ? FULFILLMENT_STATUS
+                : QAD_STATUS;
     return map[value] || { label: value, color: 'slate' };
 }
 
-export default function StatusBadge({ type = 'po', value, className = '' }) {
+export default function StatusBadge({ type = 'po', value, className = '', title }) {
     const meta = resolveStatus(type, value);
 
     return (
         <span
+            title={title}
             className={`inline-flex items-center rounded-md px-2 py-0.5 text-[0.6875rem] font-semibold tracking-wide ${COLORS[meta.color]} ${className}`}
         >
             {meta.label}

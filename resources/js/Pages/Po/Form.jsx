@@ -5,7 +5,15 @@ import SearchableSelect from '@/Components/SearchableSelect';
 import TextInput from '@/Components/TextInput';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { formatQty, isQtyInput, roundQty, toNum } from '@/utils/qty';
+import {
+    isWeekendDay,
+    weekendCellClass,
+    weekendHeaderClass,
+    weekendShortLabel,
+    weekdayLabel,
+} from '@/utils/calendar';
 import { Head, Link, useForm } from '@inertiajs/react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 function emptyItem() {
     return {
@@ -148,6 +156,9 @@ export default function Form({ order, suppliersRm, suppliersOhp, items }) {
     const { data, setData, post, put, processing, errors, transform } = useForm(
         mapOrderToForm(order),
     );
+    const [focusItemIndex, setFocusItemIndex] = useState(null);
+    const [focusToken, setFocusToken] = useState(0);
+    const itemSectionRef = useRef(null);
 
     transform((form) => ({
         ...form,
@@ -165,6 +176,38 @@ export default function Form({ order, suppliersRm, suppliersOhp, items }) {
 
     const mismatchItems = scheduleItems.filter(({ item }) => remainingQty(item) !== 0);
     const hasMismatch = mismatchItems.length > 0;
+
+    const addItem = useCallback(() => {
+        const last = data.items[data.items.length - 1];
+        const lastIsEmpty =
+            last && !String(last.item_id || '').trim() && !String(last.qty_ordered || '').trim();
+
+        if (lastIsEmpty) {
+            setFocusItemIndex(data.items.length - 1);
+            setFocusToken((token) => token + 1);
+            return;
+        }
+
+        setData('items', [...data.items, emptyItem()]);
+        setFocusItemIndex(data.items.length);
+        setFocusToken((token) => token + 1);
+    }, [data.items, setData]);
+
+    useEffect(() => {
+        const onKeyDown = (event) => {
+            if (event.code !== 'CapsLock' && event.key !== 'CapsLock') {
+                return;
+            }
+            if (!itemSectionRef.current?.contains(event.target)) {
+                return;
+            }
+            event.preventDefault();
+            addItem();
+        };
+
+        window.addEventListener('keydown', onKeyDown);
+        return () => window.removeEventListener('keydown', onKeyDown);
+    }, [addItem]);
 
     const submit = (e) => {
         e.preventDefault();
@@ -347,7 +390,7 @@ export default function Form({ order, suppliersRm, suppliersOhp, items }) {
                     </div>
 
                     {/* Section 1: Item + Qty */}
-                    <div className="ui-panel p-5 sm:p-6">
+                    <div ref={itemSectionRef} className="ui-panel p-5 sm:p-6">
                         <div className="mb-1 flex items-center gap-2">
                             <span className="inline-flex h-6 w-6 items-center justify-center rounded-md bg-brand text-xs font-bold text-white shadow-sm">
                                 1
@@ -375,6 +418,8 @@ export default function Form({ order, suppliersRm, suppliersOhp, items }) {
                                             getOptionLabel={(i) =>
                                                 `${i.item_number} — ${i.description}`
                                             }
+                                            autoFocus={focusItemIndex === itemIndex}
+                                            focusToken={focusToken}
                                             onChange={(val) =>
                                                 updateItem(itemIndex, 'item_id', val)
                                             }
@@ -398,6 +443,12 @@ export default function Form({ order, suppliersRm, suppliersOhp, items }) {
                                                         'qty_ordered',
                                                         e.target.value,
                                                     );
+                                                }
+                                            }}
+                                            onKeyDown={(e) => {
+                                                if (e.key === 'Enter') {
+                                                    e.preventDefault();
+                                                    addItem();
                                                 }
                                             }}
                                         />
@@ -431,10 +482,21 @@ export default function Form({ order, suppliersRm, suppliersOhp, items }) {
                         <button
                             type="button"
                             className="pressable text-sm font-semibold text-brand hover:text-brand-deep"
-                            onClick={() => setData('items', [...data.items, emptyItem()])}
+                            onClick={addItem}
                         >
                             + Tambah item
                         </button>
+                        <p className="mt-1.5 text-xs text-ink-muted">
+                            Pintasan: tekan{' '}
+                            <kbd className="rounded border border-line bg-surface px-1.5 py-0.5 font-semibold text-ink-soft">
+                                Caps Lock
+                            </kbd>{' '}
+                            atau{' '}
+                            <kbd className="rounded border border-line bg-surface px-1.5 py-0.5 font-semibold text-ink-soft">
+                                Enter
+                            </kbd>{' '}
+                            di kolom qty untuk menambah baris item.
+                        </p>
                         <InputError message={errors.items} className="mt-1" />
                     </div>
 
@@ -512,14 +574,24 @@ export default function Form({ order, suppliersRm, suppliersOhp, items }) {
                                             <th className="min-w-[72px] border-b border-r border-line px-2 py-2 text-right font-semibold">
                                                 Sisa
                                             </th>
-                                            {dayColumns.map((day) => (
+                                            {dayColumns.map((day) => {
+                                                const sabMin = weekendShortLabel(dueMonth, day);
+
+                                                return (
                                                 <th
                                                     key={day}
-                                                    className="min-w-[52px] border-b border-line px-1 py-2 text-center font-semibold tabular-nums"
+                                                    title={weekdayLabel(dueMonth, day)}
+                                                    className={`min-w-[52px] border-b border-line px-1 py-2 text-center font-semibold tabular-nums ${weekendHeaderClass(dueMonth, day)}`}
                                                 >
                                                     {day}
+                                                    {sabMin && (
+                                                        <div className="text-[9px] font-semibold leading-none tracking-wide">
+                                                            {sabMin}
+                                                        </div>
+                                                    )}
                                                 </th>
-                                            ))}
+                                                );
+                                            })}
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -598,11 +670,13 @@ export default function Form({ order, suppliersRm, suppliersOhp, items }) {
                                                             day,
                                                         );
                                                         const filled = toNum(cellQty) > 0;
+                                                        const weekend = isWeekendDay(dueMonth, day);
 
                                                         return (
                                                             <td
                                                                 key={day}
-                                                                className="border-b border-line p-0.5 align-middle"
+                                                                className={`border-b border-line p-0.5 align-middle ${weekendCellClass(dueMonth, day)}`}
+                                                                title={weekdayLabel(dueMonth, day)}
                                                             >
                                                                 <input
                                                                     type="text"
@@ -611,8 +685,12 @@ export default function Form({ order, suppliersRm, suppliersOhp, items }) {
                                                                     aria-label={`Qty ${itemShortLabel(items, item.item_id)} tanggal ${day}`}
                                                                     className={`no-spin w-full rounded border px-1 py-1.5 text-center text-xs tabular-nums focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand ${
                                                                         filled
-                                                                            ? 'border-brand-line bg-brand-muted font-medium text-brand-deep'
-                                                                            : 'border-transparent bg-transparent text-ink hover:border-line hover:bg-surface'
+                                                                            ? weekend
+                                                                                ? 'border-rose-300 bg-rose-100 font-medium text-rose-900'
+                                                                                : 'border-brand-line bg-brand-muted font-medium text-brand-deep'
+                                                                            : weekend
+                                                                              ? 'border-transparent bg-rose-50 text-ink hover:border-rose-200 hover:bg-rose-100'
+                                                                              : 'border-transparent bg-transparent text-ink hover:border-line hover:bg-surface'
                                                                     }`}
                                                                     value={
                                                                         cellQty === null ||
@@ -645,7 +723,8 @@ export default function Form({ order, suppliersRm, suppliersOhp, items }) {
                         {dueMonth && scheduleItems.length > 0 && (
                             <p className="mt-3 text-xs text-ink-muted">
                                 Tip: klik cell lalu ketik qty. Cell terisi akan berwarna hijau muda.
-                                Geser horizontal untuk melihat tanggal lain. Kolom Part & OHP tetap
+                                Kolom Sabtu & Minggu berwarna merah sesuai bulan due date. Geser
+                                horizontal untuk melihat tanggal lain. Kolom Part & OHP tetap
                                 terlihat saat scroll.
                             </p>
                         )}

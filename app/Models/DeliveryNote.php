@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Enums\UserRole;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasOne;
@@ -51,5 +53,24 @@ class DeliveryNote extends Model
     public function receiving(): HasOne
     {
         return $this->hasOne(Receiving::class);
+    }
+
+    public function scopeVisibleTo(Builder $query, User $user): Builder
+    {
+        return $query
+            ->when(
+                $user->hasRole(UserRole::SupplierRm),
+                fn (Builder $q) => $q->whereHas(
+                    'purchaseOrder',
+                    fn (Builder $pq) => $pq->where('supplier_rm_id', $user->company_id)
+                )
+            )
+            ->when(
+                $user->hasRole(UserRole::SupplierOhp),
+                fn (Builder $q) => $q->whereHas(
+                    'deliverySchedule',
+                    fn (Builder $sq) => $sq->where('ohp_supplier_id', $user->company_id)
+                )
+            );
     }
 }

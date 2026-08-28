@@ -6,6 +6,13 @@ import TextInput from '@/Components/TextInput';
 import Timeline from '@/Components/Timeline';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { formatQty, isQtyInput, roundQty, toNum } from '@/utils/qty';
+import {
+    isWeekendDay,
+    weekendCellClass,
+    weekendHeaderClass,
+    weekendShortLabel,
+    weekdayLabel,
+} from '@/utils/calendar';
 import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
 import { useMemo, useState } from 'react';
 
@@ -187,14 +194,23 @@ function ScheduleMatrix({
                                 Status
                             </th>
                         )}
-                        {dayColumns.map((day) => (
+                        {dayColumns.map((day) => {
+                            const sabMin = weekendShortLabel(dueMonth, day);
+                            return (
                             <th
                                 key={day}
-                                className="min-w-[52px] border-b border-line px-1 py-2 text-center font-semibold tabular-nums"
+                                title={weekdayLabel(dueMonth, day)}
+                                className={`min-w-[52px] border-b border-line px-1 py-2 text-center font-semibold tabular-nums ${weekendHeaderClass(dueMonth, day)}`}
                             >
                                 {day}
+                                {sabMin && (
+                                    <div className="text-[9px] font-semibold leading-none tracking-wide">
+                                        {sabMin}
+                                    </div>
+                                )}
                             </th>
-                        ))}
+                            );
+                        })}
                     </tr>
                 </thead>
                 <tbody>
@@ -249,11 +265,16 @@ function ScheduleMatrix({
                                 )}
                                 {dayColumns.map((day) => {
                                     const schedule = row.byDay[day];
+                                    const weekend = isWeekendDay(dueMonth, day);
+                                    const weekendWash = weekendCellClass(dueMonth, day);
                                     if (!schedule) {
                                         return (
                                             <td
                                                 key={day}
-                                                className="border-b border-line px-1 py-2 text-center text-slate-300"
+                                                title={weekdayLabel(dueMonth, day)}
+                                                className={`border-b border-line px-1 py-2 text-center ${
+                                                    weekend ? 'bg-rose-50 text-rose-300' : 'text-slate-300'
+                                                }`}
                                             >
                                                 ·
                                             </td>
@@ -283,20 +304,24 @@ function ScheduleMatrix({
                                         return (
                                             <td
                                                 key={day}
-                                                className="border-b border-line p-0.5 align-middle"
+                                                title={weekdayLabel(dueMonth, day)}
+                                                className={`border-b border-line p-0.5 align-middle ${weekendWash}`}
                                             >
                                                 <input
                                                     type="text"
                                                     inputMode="numeric"
                                                     autoComplete="off"
-                                                    title={`Rencana: ${formatQty(planned)} kg`}
                                                     aria-label={`Qty confirm ${row.item.item?.item_number} tgl ${day}`}
                                                     className={`no-spin w-full rounded border px-1 py-1.5 text-center text-xs tabular-nums focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand ${
                                                         changed
                                                             ? 'border-amber-300 bg-amber-50 font-medium text-amber-950'
                                                             : filled
-                                                              ? 'border-brand-line bg-brand-muted font-medium text-brand-deep'
-                                                              : 'border-line bg-surface text-ink'
+                                                              ? weekend
+                                                                ? 'border-rose-300 bg-rose-100 font-medium text-rose-900'
+                                                                : 'border-brand-line bg-brand-muted font-medium text-brand-deep'
+                                                              : weekend
+                                                                ? 'border-line bg-rose-50 text-ink'
+                                                                : 'border-line bg-surface text-ink'
                                                     }`}
                                                     value={
                                                         confirmedVal === null ||
@@ -323,8 +348,12 @@ function ScheduleMatrix({
                                               : cellBadge?.label === 'Over'
                                                 ? 'bg-rose-50 text-rose-900'
                                                 : confirmedNum > 0
-                                                  ? 'bg-brand-muted/80 text-brand-deep'
-                                                  : 'text-ink-muted';
+                                                  ? weekend
+                                                    ? 'bg-rose-100 text-rose-900'
+                                                    : 'bg-brand-muted/80 text-brand-deep'
+                                                  : weekend
+                                                    ? 'bg-rose-50 text-ink-muted'
+                                                    : 'text-ink-muted';
 
                                     return (
                                         <td
@@ -332,8 +361,8 @@ function ScheduleMatrix({
                                             className={`border-b border-line px-1 py-1.5 text-center align-middle ${tone}`}
                                             title={
                                                 !hideInternalHistory
-                                                    ? `Rencana ${formatQty(planned)} kg`
-                                                    : undefined
+                                                    ? `${weekdayLabel(dueMonth, day)} · Rencana ${formatQty(planned)} kg`
+                                                    : weekdayLabel(dueMonth, day)
                                             }
                                         >
                                             <div className="text-xs font-semibold tabular-nums">
@@ -448,8 +477,17 @@ export default function Show({ order, hideInternalHistory = false }) {
                         <h2 className="text-xl font-semibold text-ink">
                             {order.po_number}
                         </h2>
-                        <div className="mt-2">
+                        <div className="mt-2 flex flex-wrap items-center gap-2">
                             <StatusBadge type="po" value={order.status} />
+                            <StatusBadge
+                                type="fulfillment"
+                                value={order.is_closed ? 'closed' : 'open'}
+                                title={
+                                    order.is_closed
+                                        ? 'Seluruh DN sudah dikirim dan sudah di-approve'
+                                        : 'Masih ada DN yang belum dikirim atau belum di-approve'
+                                }
+                            />
                         </div>
                     </div>
                     <div className="flex flex-wrap gap-2">

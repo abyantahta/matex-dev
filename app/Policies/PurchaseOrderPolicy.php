@@ -21,13 +21,15 @@ class PurchaseOrderPolicy
         }
 
         if ($user->hasRole(UserRole::SupplierRm)) {
-            return $purchaseOrder->supplier_rm_id === $user->company_id;
+            return $user->company_id
+                && (int) $purchaseOrder->supplier_rm_id === (int) $user->company_id;
         }
 
         if ($user->hasRole(UserRole::SupplierOhp)) {
-            return $purchaseOrder->schedules()
-                ->where('ohp_supplier_id', $user->company_id)
-                ->exists();
+            return $user->company_id
+                && $purchaseOrder->schedules()
+                    ->where('ohp_supplier_id', $user->company_id)
+                    ->exists();
         }
 
         return false;
@@ -52,7 +54,8 @@ class PurchaseOrderPolicy
     public function confirmAsRm(User $user, PurchaseOrder $purchaseOrder): bool
     {
         return $user->hasRole(UserRole::SupplierRm)
-            && $purchaseOrder->supplier_rm_id === $user->company_id
+            && $user->company_id
+            && (int) $purchaseOrder->supplier_rm_id === (int) $user->company_id
             && $purchaseOrder->status === PoStatus::AwaitingRmConfirm;
     }
 

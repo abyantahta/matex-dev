@@ -15,7 +15,8 @@ class DeliverySchedulePolicy
 
         return $user->hasRole(UserRole::SupplierRm)
             && $po
-            && $po->supplier_rm_id === $user->company_id
+            && $user->company_id
+            && (int) $po->supplier_rm_id === (int) $user->company_id
             && in_array($po->status, [PoStatus::Confirmed, PoStatus::InProgress], true)
             && $schedule->deliveryNote === null;
     }

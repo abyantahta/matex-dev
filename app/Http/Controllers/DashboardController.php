@@ -57,29 +57,17 @@ class DashboardController extends Controller
         };
 
         $recentPos = PurchaseOrder::query()
-            ->with(['supplierRm', 'schedules.ohpSupplier'])
-            ->when($user->hasRole(UserRole::SupplierRm), fn ($q) => $q->where('supplier_rm_id', $user->company_id))
-            ->when(
-                $user->hasRole(UserRole::SupplierOhp),
-                fn ($q) => $q->whereHas(
-                    'schedules',
-                    fn ($sq) => $sq->where('ohp_supplier_id', $user->company_id)
-                )
-            )
+            ->visibleTo($user)
+            ->withFulfillmentCounts()
+            ->with(['supplierRm'])
+            ->withSchedulesVisibleTo($user)
             ->latest()
             ->limit(8)
-            ->get();
+            ->get()
+            ->each(fn (PurchaseOrder $po) => $po->append('is_closed'));
 
         $scopeRunningPo = function ($q) use ($user, $runningStatuses) {
-            $q->whereIn('status', $runningStatuses)
-                ->when($user->hasRole(UserRole::SupplierRm), fn ($inner) => $inner->where('supplier_rm_id', $user->company_id))
-                ->when(
-                    $user->hasRole(UserRole::SupplierOhp),
-                    fn ($inner) => $inner->whereHas(
-                        'schedules',
-                        fn ($sq) => $sq->where('ohp_supplier_id', $user->company_id)
-                    )
-                );
+            $q->whereIn('status', $runningStatuses)->visibleTo($user);
         };
 
         $itemRows = Item::query()
@@ -92,9 +80,13 @@ class DashboardController extends Controller
                 });
             })
             ->with([
-                'purchaseOrderItems' => function ($q) use ($scopeRunningPo) {
+                'purchaseOrderItems' => function ($q) use ($scopeRunningPo, $user) {
                     $q->whereHas('purchaseOrder', $scopeRunningPo)
-                        ->with(['purchaseOrder.supplierRm', 'purchaseOrder.schedules.ohpSupplier']);
+                        ->with(['purchaseOrder' => function ($pq) use ($user) {
+                            $pq->withFulfillmentCounts()
+                                ->with(['supplierRm'])
+                                ->withSchedulesVisibleTo($user);
+                        }]);
                 },
             ])
             ->orderBy('item_number')
@@ -107,10 +99,13 @@ class DashboardController extends Controller
                         $po = $lines->first()->purchaseOrder;
                         $qty = (int) round($lines->sum(fn ($line) => (float) ($line->qty_confirmed ?? $line->qty_ordered)));
 
+                        $po->append('is_closed');
+
                         return [
                             'id' => $po->id,
                             'po_number' => $po->po_number,
                             'status' => $po->status instanceof PoStatus ? $po->status->value : $po->status,
+                            'is_closed' => $po->is_closed,
                             'supplier_rm' => $po->supplierRm,
                             'due_date' => $po->due_date,
                             'qty' => $qty,
