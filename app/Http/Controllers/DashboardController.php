@@ -96,7 +96,11 @@ class DashboardController extends Controller
                 $pos = $item->purchaseOrderItems
                     ->groupBy('purchase_order_id')
                     ->map(function ($lines) {
-                        $po = $lines->first()->purchaseOrder;
+                        $po = $lines->first()?->purchaseOrder;
+                        if (! $po) {
+                            return null;
+                        }
+
                         $qty = (int) round($lines->sum(fn ($line) => (float) ($line->qty_confirmed ?? $line->qty_ordered)));
 
                         $po->append('is_closed');
@@ -111,6 +115,7 @@ class DashboardController extends Controller
                             'qty' => $qty,
                         ];
                     })
+                    ->filter()
                     ->values();
 
                 return [

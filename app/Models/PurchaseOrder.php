@@ -97,7 +97,7 @@ class PurchaseOrder extends Model
     public function scopeWithSchedulesVisibleTo(Builder $query, User $user): Builder
     {
         return $query->with([
-            'schedules' => function (Builder $q) use ($user) {
+            'schedules' => function ($q) use ($user) {
                 if ($user->hasRole(UserRole::SupplierOhp) && $user->company_id) {
                     $q->where('ohp_supplier_id', $user->company_id);
                 }
