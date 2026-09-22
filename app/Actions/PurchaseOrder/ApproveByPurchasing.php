@@ -5,11 +5,14 @@ namespace App\Actions\PurchaseOrder;
 use App\Actions\Concerns\LogsPoStatus;
 use App\Enums\PoStatus;
 use App\Enums\QadSyncStatus;
+use App\Enums\UserRole;
 use App\Models\PurchaseOrder;
 use App\Models\User;
+use App\Notifications\PurchaseOrderApprovedNotification;
 use App\Services\Qad\QadPurchaseOrderService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\Validation\ValidationException;
 use Throwable;
 
@@ -27,7 +30,7 @@ class ApproveByPurchasing
             ]);
         }
 
-        return DB::transaction(function () use ($po, $user) {
+        $po = DB::transaction(function () use ($po, $user) {
             $from = $po->status;
             $po->update([
                 'status' => PoStatus::Confirmed,
@@ -56,6 +59,35 @@ class ApproveByPurchasing
 
             return $po->fresh(['items.item', 'schedules.deliveryNote', 'deliveryNotes']);
         });
+
+        // Outside the transaction — an external mail send has no business
+        // being inside a DB transaction, and this shouldn't roll back the
+        // approval or block on SMTP either way.
+        $this->notifySupplier($po);
+
+        return $po;
+    }
+
+    /**
+     * Notifies every Supplier RM user on this PO's company — independent of
+     * QAD sync outcome (see class docblock on the notification itself).
+     */
+    private function notifySupplier(PurchaseOrder $po): void
+    {
+        try {
+            $po->loadMissing('supplierRm.users');
+
+            $recipients = $po->supplierRm->users->filter(
+                fn (User $recipient) => $recipient->hasRole(UserRole::SupplierRm)
+            );
+
+            Notification::send($recipients, new PurchaseOrderApprovedNotification($po));
+        } catch (Throwable $e) {
+            Log::error('Failed to send PO approval email to supplier', [
+                'po_id' => $po->id,
+                'exception' => $e,
+            ]);
+        }
     }
 
     /**

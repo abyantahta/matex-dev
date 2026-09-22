@@ -27,9 +27,9 @@ class RejectByPurchasing
             'rm_confirmed_at' => null,
         ]);
 
-        // Reset konfirmasi agar Supplier RM bisa revisi dari qty rencana, bukan angka yang ditolak.
-        $po->items()->update(['qty_confirmed' => null]);
-        $po->schedules()->update(['qty_confirmed' => null]);
+        // Deliberately NOT resetting items/schedules qty_confirmed here —
+        // Supplier RM should see and revise their own last-submitted
+        // numbers, not lose them back to Purchasing's original draft plan.
 
         $this->logStatus(
             $po,

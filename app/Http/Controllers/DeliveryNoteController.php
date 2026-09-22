@@ -102,15 +102,16 @@ class DeliveryNoteController extends Controller
     ): RedirectResponse {
         $delivery_schedule->load(['deliveryNote', 'purchaseOrder']);
 
-        $dn = $action->executeForSchedule(
+        $action->executeForSchedule(
             $delivery_schedule,
             $request->validated('rm_sj_number'),
             $request->validated('delivery_date'),
         );
 
-        return redirect()
-            ->route('delivery-notes.show', $dn)
-            ->with('success', 'DN berhasil digenerate. Silakan print/reprint lalu konfirmasi berangkat.');
+        // Stay on the PO page (not the new DN's page) — a PO often has
+        // several schedules needing a DN each, so this lets Supplier RM
+        // generate them one after another without navigating back and forth.
+        return back()->with('success', 'DN berhasil digenerate. Silakan print/reprint lalu konfirmasi berangkat.');
     }
 
     public function updateDeliveryDate(

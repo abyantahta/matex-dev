@@ -104,10 +104,13 @@ function ScheduleMatrix({
     mode,
     scheduleDrafts,
     onChangeQty,
+    onChangeDate,
     showRmChanges,
     hideInternalHistory,
 }) {
     const dayColumns = Array.from({ length: dueMonth.days }, (_, i) => i + 1);
+    const monthMinDate = dateForDay(dueMonth, 1);
+    const monthMaxDate = dateForDay(dueMonth, dueMonth.days);
 
     const rows = useMemo(() => {
         return (order.items || []).map((item) => {
@@ -116,7 +119,13 @@ function ScheduleMatrix({
             );
             const byDay = {};
             itemSchedules.forEach((s) => {
-                const day = dayOfDate(s.scheduled_date);
+                // In edit mode a schedule renders under whatever date is
+                // currently in its draft (so moving it live re-renders the
+                // cell under the new day column), not the original saved date.
+                const draft = scheduleDrafts?.find((d) => String(d.id) === String(s.id));
+                const effectiveDate =
+                    mode === 'edit' && draft?.scheduled_date ? draft.scheduled_date : s.scheduled_date;
+                const day = dayOfDate(effectiveDate);
                 if (!day || day < 1 || day > dueMonth.days) {
                     return;
                 }
@@ -200,7 +209,7 @@ function ScheduleMatrix({
                             <th
                                 key={day}
                                 title={weekdayLabel(dueMonth, day)}
-                                className={`min-w-[52px] border-b border-line px-1 py-2 text-center font-semibold tabular-nums ${weekendHeaderClass(dueMonth, day)}`}
+                                className={`${mode === 'edit' ? 'min-w-[92px]' : 'min-w-[52px]'} border-b border-line px-1 py-2 text-center font-semibold tabular-nums ${weekendHeaderClass(dueMonth, day)}`}
                             >
                                 {day}
                                 {sabMin && (
@@ -301,41 +310,65 @@ function ScheduleMatrix({
                                     if (mode === 'edit') {
                                         const filled = confirmedNum > 0;
                                         const changed = roundQty(confirmedNum) !== roundQty(planned);
+                                        const dateVal =
+                                            draft?.scheduled_date ||
+                                            schedule.scheduled_date?.slice(0, 10) ||
+                                            '';
+                                        const dateChanged =
+                                            dateVal !== schedule.scheduled_date?.slice(0, 10);
                                         return (
                                             <td
                                                 key={day}
                                                 title={weekdayLabel(dueMonth, day)}
                                                 className={`border-b border-line p-0.5 align-middle ${weekendWash}`}
                                             >
-                                                <input
-                                                    type="text"
-                                                    inputMode="numeric"
-                                                    autoComplete="off"
-                                                    aria-label={`Qty confirm ${row.item.item?.item_number} tgl ${day}`}
-                                                    className={`no-spin w-full rounded border px-1 py-1.5 text-center text-xs tabular-nums focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand ${
-                                                        changed
-                                                            ? 'border-amber-300 bg-amber-50 font-medium text-amber-950'
-                                                            : filled
-                                                              ? weekend
-                                                                ? 'border-rose-300 bg-rose-100 font-medium text-rose-900'
-                                                                : 'border-brand-line bg-brand-muted font-medium text-brand-deep'
-                                                              : weekend
-                                                                ? 'border-line bg-rose-50 text-ink'
-                                                                : 'border-line bg-surface text-ink'
-                                                    }`}
-                                                    value={
-                                                        confirmedVal === null ||
-                                                        confirmedVal === undefined
-                                                            ? ''
-                                                            : String(confirmedVal)
-                                                    }
-                                                    onChange={(e) => {
-                                                        if (isQtyInput(e.target.value)) {
-                                                            onChangeQty(schedule.id, e.target.value);
+                                                <div className="space-y-0.5">
+                                                    <input
+                                                        type="date"
+                                                        min={monthMinDate}
+                                                        max={monthMaxDate}
+                                                        aria-label={`Tanggal ${row.item.item?.item_number}`}
+                                                        title="Ganti tanggal pengiriman"
+                                                        className={`w-full rounded border px-0.5 py-0.5 text-center text-[10px] tabular-nums focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand ${
+                                                            dateChanged
+                                                                ? 'border-amber-300 bg-amber-50 text-amber-950'
+                                                                : 'border-line bg-surface text-ink-soft'
+                                                        }`}
+                                                        value={dateVal}
+                                                        onChange={(e) =>
+                                                            onChangeDate(schedule.id, e.target.value)
                                                         }
-                                                    }}
-                                                    onFocus={(e) => e.target.select()}
-                                                />
+                                                    />
+                                                    <input
+                                                        type="text"
+                                                        inputMode="numeric"
+                                                        autoComplete="off"
+                                                        aria-label={`Qty confirm ${row.item.item?.item_number} tgl ${day}`}
+                                                        className={`no-spin w-full rounded border px-1 py-1.5 text-center text-xs tabular-nums focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand ${
+                                                            changed
+                                                                ? 'border-amber-300 bg-amber-50 font-medium text-amber-950'
+                                                                : filled
+                                                                  ? weekend
+                                                                    ? 'border-rose-300 bg-rose-100 font-medium text-rose-900'
+                                                                    : 'border-brand-line bg-brand-muted font-medium text-brand-deep'
+                                                                  : weekend
+                                                                    ? 'border-line bg-rose-50 text-ink'
+                                                                    : 'border-line bg-surface text-ink'
+                                                        }`}
+                                                        value={
+                                                            confirmedVal === null ||
+                                                            confirmedVal === undefined
+                                                                ? ''
+                                                                : String(confirmedVal)
+                                                        }
+                                                        onChange={(e) => {
+                                                            if (isQtyInput(e.target.value)) {
+                                                                onChangeQty(schedule.id, e.target.value);
+                                                            }
+                                                        }}
+                                                        onFocus={(e) => e.target.select()}
+                                                    />
+                                                </div>
                                             </td>
                                         );
                                     }
@@ -469,6 +502,15 @@ export default function Show({ order, hideInternalHistory = false }) {
         });
     };
 
+    const updateScheduleDate = (scheduleId, date) => {
+        rmForm.setData((data) => ({
+            ...data,
+            schedules: data.schedules.map((s) =>
+                String(s.id) === String(scheduleId) ? { ...s, scheduled_date: date } : s,
+            ),
+        }));
+    };
+
     return (
         <AuthenticatedLayout
             header={
@@ -565,7 +607,7 @@ export default function Show({ order, hideInternalHistory = false }) {
                             </div>
                             <p className="mb-4 text-sm text-ink-muted">
                                 {canConfirmRm
-                                    ? 'Isi qty confirmed (kg) di cell tanggal yang terjadwal. Cell kuning = beda dari rencana Purchasing.'
+                                    ? 'Isi qty confirmed (kg) di cell tanggal yang terjadwal. Bisa juga ganti tanggalnya (dalam bulan due date) kalau perlu geser jadwal kirim. Cell kuning = beda dari rencana Purchasing.'
                                     : canApprove || showRmChanges
                                       ? 'Tabel perbandingan rencana vs konfirmasi RM. Hijau = OK, kuning = minus, merah = over.'
                                       : 'Alokasi qty per tanggal dalam bulan due date.'}
@@ -578,6 +620,7 @@ export default function Show({ order, hideInternalHistory = false }) {
                                     mode={matrixMode === 'edit' ? 'edit' : showRmChanges ? 'review' : 'view'}
                                     scheduleDrafts={canConfirmRm ? rmForm.data.schedules : null}
                                     onChangeQty={updateScheduleQty}
+                                    onChangeDate={updateScheduleDate}
                                     showRmChanges={showRmChanges || canConfirmRm}
                                     hideInternalHistory={hideInternalHistory}
                                 />
@@ -589,8 +632,9 @@ export default function Show({ order, hideInternalHistory = false }) {
 
                             {canConfirmRm && (
                                 <p className="mt-3 text-xs text-ink-muted">
-                                    Tip: hanya cell bertanggal jadwal yang bisa diisi. Total Confirm
-                                    per part dihitung otomatis dari cell.
+                                    Tip: hanya cell bertanggal jadwal yang bisa diisi — cell tersebut
+                                    juga bisa digeser ke tanggal lain (input tanggal kecil di atas
+                                    qty). Total Confirm per part dihitung otomatis dari cell.
                                 </p>
                             )}
                         </section>
@@ -731,6 +775,7 @@ export default function Show({ order, hideInternalHistory = false }) {
                                                                             10,
                                                                         ),
                                                                 },
+                                                                { preserveScroll: true },
                                                             )
                                                         }
                                                     >

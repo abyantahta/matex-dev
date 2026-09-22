@@ -302,6 +302,31 @@ class QadEndToEndRoleTest extends TestCase
         $this->assertSame(PoStatus::AwaitingPurchasingOk, $po->fresh()->status);
     }
 
+    public function test_supplier_rm_can_move_schedule_date_within_due_month_but_not_outside_it(): void
+    {
+        // due_date is 2026-12-20 in makeFixturePo, so the confirm matrix's
+        // valid range is the whole of December 2026.
+        $po = $this->makeFixturePo(PoStatus::AwaitingRmConfirm);
+        $poItem = $po->items->first();
+        $schedule = $po->schedules->first();
+
+        $this->actingAs($this->rm())
+            ->post(route('purchase-orders.confirm-rm', $po), [
+                'items' => [['id' => $poItem->id, 'qty_confirmed' => 30]],
+                'schedules' => [['id' => $schedule->id, 'qty_confirmed' => 30, 'scheduled_date' => '2027-01-05']],
+            ])
+            ->assertSessionHasErrors('schedules.0.scheduled_date');
+        $this->assertSame('2026-12-05', $schedule->fresh()->scheduled_date->format('Y-m-d'));
+
+        $this->actingAs($this->rm())
+            ->post(route('purchase-orders.confirm-rm', $po), [
+                'items' => [['id' => $poItem->id, 'qty_confirmed' => 30]],
+                'schedules' => [['id' => $schedule->id, 'qty_confirmed' => 30, 'scheduled_date' => '2026-12-18']],
+            ])
+            ->assertRedirect();
+        $this->assertSame('2026-12-18', $schedule->fresh()->scheduled_date->format('Y-m-d'));
+    }
+
     public function test_only_purchasing_and_admin_can_approve_or_reject_po(): void
     {
         $po = $this->makeFixturePo(PoStatus::AwaitingPurchasingOk);
@@ -318,7 +343,9 @@ class QadEndToEndRoleTest extends TestCase
         $po->refresh();
         $this->assertSame(PoStatus::AwaitingRmConfirm, $po->status);
         $this->assertSame('Qty tidak sesuai stok', $po->rejection_reason);
-        $this->assertNull($po->items->first()->fresh()->qty_confirmed);
+        // RM's last-submitted qty_confirmed must survive a reject — they
+        // revise from their own numbers, not lose them back to the draft.
+        $this->assertSame(30, $po->items->first()->fresh()->qty_confirmed);
     }
 
     public function test_only_the_matching_supplier_rm_can_generate_dn_and_confirm_shipment(): void
