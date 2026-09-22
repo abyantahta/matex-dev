@@ -1,20 +1,31 @@
 import InputError from '@/Components/InputError';
 import InputLabel from '@/Components/InputLabel';
 import PrimaryButton from '@/Components/PrimaryButton';
+import SearchableSelect from '@/Components/SearchableSelect';
 import TextInput from '@/Components/TextInput';
 import AdminLayout from '@/Layouts/AdminLayout';
 import { Head, Link, useForm } from '@inertiajs/react';
 
-export default function Form({ user, companies, roles }) {
+const SUPPLIER_ROLE_CATEGORY = {
+    supplier_rm: 'raw_mat',
+    supplier_ohp: 'ohp',
+};
+
+export default function Form({ user, prefill, qadSuppliers, roles }) {
     const editing = Boolean(user);
     const { data, setData, post, put, processing, errors } = useForm({
         name: user?.name || '',
         email: user?.email || '',
         password: '',
         password_confirmation: '',
-        role: user?.role || 'purchasing',
-        company_id: user?.company_id || '',
+        role: user?.role || prefill?.role || roles[0]?.value || 'purchasing',
+        supplier_code: user?.company?.code || prefill?.supplier_code || '',
     });
+
+    const supplierCategory = SUPPLIER_ROLE_CATEGORY[data.role];
+    const supplierOptions = supplierCategory
+        ? qadSuppliers.filter((s) => s.category === supplierCategory)
+        : [];
 
     const submit = (e) => {
         e.preventDefault();
@@ -28,7 +39,7 @@ export default function Form({ user, companies, roles }) {
     return (
         <AdminLayout
             title={editing ? `Edit ${user.name}` : 'Tambah User'}
-            description="Atur kredensial login, role, dan company."
+            description="Atur kredensial login, role, dan supplier (untuk role Supplier RM/OHP)."
         >
             <Head title={editing ? 'Edit User' : 'Tambah User'} />
 
@@ -100,22 +111,35 @@ export default function Form({ user, companies, roles }) {
                         </select>
                         <InputError message={errors.role} className="mt-1" />
                     </div>
-                    <div>
-                        <InputLabel value="Company" />
-                        <select
-                            className="mt-1 w-full rounded-md border-line"
-                            value={data.company_id}
-                            onChange={(e) => setData('company_id', e.target.value)}
-                        >
-                            <option value="">— Tidak ada —</option>
-                            {companies.map((c) => (
-                                <option key={c.id} value={c.id}>
-                                    {c.code} — {c.name}
-                                </option>
-                            ))}
-                        </select>
-                        <InputError message={errors.company_id} className="mt-1" />
-                    </div>
+                    {supplierCategory && (
+                        <div>
+                            <InputLabel value="Supplier" />
+                            <SearchableSelect
+                                options={supplierOptions}
+                                value={data.supplier_code}
+                                placeholder="Ketik kode / nama supplier..."
+                                getOptionValue={(s) => s.qad_code}
+                                getOptionLabel={(s) =>
+                                    `${s.qad_code} — ${s.name}${s.city ? ` (${s.city})` : ''}`
+                                }
+                                onChange={(val) => setData('supplier_code', val)}
+                            />
+                            <InputError message={errors.supplier_code} className="mt-1" />
+                            {supplierOptions.length === 0 && (
+                                <p className="mt-1 text-xs text-amber-700">
+                                    Belum ada supplier bertanda kategori ini. Tandai dulu di
+                                    halaman{' '}
+                                    <Link
+                                        href={route('admin.qad-suppliers.index')}
+                                        className="underline"
+                                    >
+                                        Suppliers
+                                    </Link>
+                                    .
+                                </p>
+                            )}
+                        </div>
+                    )}
                 </div>
 
                 <div className="flex justify-end gap-3 pt-2">

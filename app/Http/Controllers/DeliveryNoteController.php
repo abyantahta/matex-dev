@@ -61,14 +61,16 @@ class DeliveryNoteController extends Controller
             'purchaseOrderItem.item',
             'deliverySchedule.ohpSupplier',
             'ohpConfirmation.confirmer',
-            'receiving.receiver',
+            'receivings.receiver',
         ]);
+        $deliveryNote->append(['received_qty', 'remaining_qty', 'is_fully_received']);
 
         return Inertia::render('Dn/Show', [
             'note' => $deliveryNote,
             'sjUrl' => $deliveryNote->ohpConfirmation
                 ? asset('storage/'.$deliveryNote->ohpConfirmation->sj_document_path)
                 : null,
+            'receivingEnabled' => (bool) config('qad.receiving_enabled'),
         ]);
     }
 

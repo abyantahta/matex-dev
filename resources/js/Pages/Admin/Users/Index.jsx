@@ -53,6 +53,20 @@ export default function Index({ users, filters, roles }) {
                         </option>
                     ))}
                 </select>
+                {filters.company_id && (
+                    <span className="inline-flex items-center gap-1.5 rounded-full bg-brand-muted px-3 py-1.5 text-xs font-medium text-brand-deep">
+                        Difilter per supplier
+                        <button
+                            type="button"
+                            className="text-brand-deep/70 hover:text-brand-deep"
+                            onClick={() =>
+                                applyFilters({ ...filters, company_id: undefined })
+                            }
+                        >
+                            ×
+                        </button>
+                    </span>
+                )}
             </div>
 
             {!users.data.length ? (

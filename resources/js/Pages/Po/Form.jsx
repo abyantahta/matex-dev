@@ -17,9 +17,9 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 function emptyItem() {
     return {
-        item_id: '',
+        item_number: '',
         qty_ordered: '',
-        ohp_supplier_id: '',
+        ohp_supplier_code: '',
         schedules: [],
     };
 }
@@ -36,25 +36,24 @@ function remainingQty(item) {
     return roundQty(toNum(item.qty_ordered) - scheduledTotal(item));
 }
 
-function itemLabel(itemsCatalog, itemId) {
-    const found = itemsCatalog.find((i) => String(i.id) === String(itemId));
+function itemLabel(itemsCatalog, itemNumber) {
+    const found = itemsCatalog.find((i) => i.qad_code === itemNumber);
     if (!found) {
         return 'Item belum dipilih';
     }
-    return `${found.item_number} — ${found.description}`;
+    return `${found.qad_code} — ${found.description}`;
 }
 
-function itemShortLabel(itemsCatalog, itemId) {
-    const found = itemsCatalog.find((i) => String(i.id) === String(itemId));
+function itemShortLabel(itemsCatalog, itemNumber) {
+    const found = itemsCatalog.find((i) => i.qad_code === itemNumber);
     if (!found) {
         return '—';
     }
-    return found.item_number;
+    return found.qad_code;
 }
 
-function defaultOhpForItem(itemsCatalog, itemId) {
-    const found = itemsCatalog.find((i) => String(i.id) === String(itemId));
-    return found?.subcont_ohp_id ? String(found.subcont_ohp_id) : '';
+function defaultOhpForItem(itemDefaults, itemNumber) {
+    return itemDefaults?.[itemNumber]?.subcont_ohp_code || '';
 }
 
 function parseDueMonth(dueDate) {
@@ -70,6 +69,13 @@ function dateForDay(dueMonth, day) {
     return `${dueMonth.year}-${pad2(dueMonth.month)}-${pad2(day)}`;
 }
 
+/** Default due date untuk PO baru: tanggal terakhir bulan depan. */
+function defaultDueDate() {
+    const now = new Date();
+    const lastDayNextMonth = new Date(now.getFullYear(), now.getMonth() + 2, 0);
+    return `${lastDayNextMonth.getFullYear()}-${pad2(lastDayNextMonth.getMonth() + 1)}-${pad2(lastDayNextMonth.getDate())}`;
+}
+
 function monthTitle(dueMonth) {
     const label = new Date(dueMonth.year, dueMonth.month - 1, 1).toLocaleDateString('id-ID', {
         month: 'long',
@@ -78,15 +84,15 @@ function monthTitle(dueMonth) {
     return label;
 }
 
-function rowOhp(item, itemsCatalog) {
-    if (item.ohp_supplier_id) {
-        return String(item.ohp_supplier_id);
+function rowOhp(item, itemDefaults) {
+    if (item.ohp_supplier_code) {
+        return item.ohp_supplier_code;
     }
-    const fromSchedule = (item.schedules || []).find((s) => s.ohp_supplier_id)?.ohp_supplier_id;
+    const fromSchedule = (item.schedules || []).find((s) => s.ohp_supplier_code)?.ohp_supplier_code;
     if (fromSchedule) {
-        return String(fromSchedule);
+        return fromSchedule;
     }
-    return defaultOhpForItem(itemsCatalog, item.item_id);
+    return defaultOhpForItem(itemDefaults, item.item_number);
 }
 
 function qtyOnDay(item, dueMonth, day) {
@@ -98,9 +104,8 @@ function qtyOnDay(item, dueMonth, day) {
 function mapOrderToForm(order) {
     if (!order) {
         return {
-            po_number: '',
-            supplier_rm_id: '',
-            due_date: '',
+            supplier_code: '',
+            due_date: defaultDueDate(),
             notes: '',
             items: [emptyItem()],
         };
@@ -114,24 +119,24 @@ function mapOrderToForm(order) {
         schedulesByItem[s.purchase_order_item_id].push({
             scheduled_date: s.scheduled_date?.slice(0, 10),
             qty: s.qty === null || s.qty === undefined ? '' : String(toNum(s.qty)),
-            ohp_supplier_id: s.ohp_supplier_id ? String(s.ohp_supplier_id) : '',
+            ohp_supplier_code: s.ohp_supplier?.code || '',
         });
     });
 
     return {
         po_number: order.po_number,
-        supplier_rm_id: order.supplier_rm_id,
+        supplier_code: order.supplier_rm?.code || '',
         due_date: order.due_date?.slice(0, 10),
         notes: order.notes || '',
         items: (order.items || []).map((item) => {
             const schedules = schedulesByItem[item.id] || [];
             return {
-                item_id: item.item_id,
+                item_number: item.item?.item_number,
                 qty_ordered:
                     item.qty_ordered === null || item.qty_ordered === undefined
                         ? ''
                         : String(toNum(item.qty_ordered)),
-                ohp_supplier_id: schedules[0]?.ohp_supplier_id || '',
+                ohp_supplier_code: schedules[0]?.ohp_supplier_code || '',
                 schedules,
             };
         }),
@@ -139,11 +144,11 @@ function mapOrderToForm(order) {
 }
 
 function cleanItemsForSubmit(items) {
-    return items.map(({ ohp_supplier_id, ...item }) => ({
+    return items.map(({ ohp_supplier_code, ...item }) => ({
         ...item,
         qty_ordered: toNum(item.qty_ordered),
         schedules: (item.schedules || [])
-            .filter((s) => s.scheduled_date && toNum(s.qty) > 0 && s.ohp_supplier_id)
+            .filter((s) => s.scheduled_date && toNum(s.qty) > 0 && s.ohp_supplier_code)
             .map((s) => ({
                 ...s,
                 qty: toNum(s.qty),
@@ -151,7 +156,7 @@ function cleanItemsForSubmit(items) {
     }));
 }
 
-export default function Form({ order, suppliersRm, suppliersOhp, items }) {
+export default function Form({ order, qadSuppliers, qadSuppliersOhp, qadItems, itemDefaults }) {
     const editing = Boolean(order);
     const { data, setData, post, put, processing, errors, transform } = useForm(
         mapOrderToForm(order),
@@ -172,7 +177,7 @@ export default function Form({ order, suppliersRm, suppliersOhp, items }) {
 
     const scheduleItems = data.items
         .map((item, index) => ({ item, index }))
-        .filter(({ item }) => item.item_id && toNum(item.qty_ordered) > 0);
+        .filter(({ item }) => item.item_number && toNum(item.qty_ordered) > 0);
 
     const mismatchItems = scheduleItems.filter(({ item }) => remainingQty(item) !== 0);
     const hasMismatch = mismatchItems.length > 0;
@@ -180,7 +185,7 @@ export default function Form({ order, suppliersRm, suppliersOhp, items }) {
     const addItem = useCallback(() => {
         const last = data.items[data.items.length - 1];
         const lastIsEmpty =
-            last && !String(last.item_id || '').trim() && !String(last.qty_ordered || '').trim();
+            last && !String(last.item_number || '').trim() && !String(last.qty_ordered || '').trim();
 
         if (lastIsEmpty) {
             setFocusItemIndex(data.items.length - 1);
@@ -222,26 +227,26 @@ export default function Form({ order, suppliersRm, suppliersOhp, items }) {
         const next = [...data.items];
         next[index] = { ...next[index], [key]: value };
 
-        if (key === 'item_id') {
-            const defaultOhp = defaultOhpForItem(items, value);
-            next[index].ohp_supplier_id = defaultOhp;
+        if (key === 'item_number') {
+            const defaultOhp = defaultOhpForItem(itemDefaults, value);
+            next[index].ohp_supplier_code = defaultOhp;
             next[index].schedules = (next[index].schedules || []).map((s) => ({
                 ...s,
-                ohp_supplier_id: defaultOhp,
+                ohp_supplier_code: defaultOhp,
             }));
         }
 
         setData('items', next);
     };
 
-    const setRowOhp = (itemIndex, ohpSupplierId) => {
+    const setRowOhp = (itemIndex, ohpSupplierCode) => {
         const next = [...data.items];
         const item = next[itemIndex];
         const schedules = (item.schedules || []).map((s) => ({
             ...s,
-            ohp_supplier_id: ohpSupplierId,
+            ohp_supplier_code: ohpSupplierCode,
         }));
-        next[itemIndex] = { ...item, ohp_supplier_id: ohpSupplierId, schedules };
+        next[itemIndex] = { ...item, ohp_supplier_code: ohpSupplierCode, schedules };
         setData('items', next);
     };
 
@@ -253,7 +258,7 @@ export default function Form({ order, suppliersRm, suppliersOhp, items }) {
         const next = [...data.items];
         const item = next[itemIndex];
         const date = dateForDay(dueMonth, day);
-        const ohp = rowOhp(item, items);
+        const ohp = rowOhp(item, itemDefaults);
         let schedules = [...(item.schedules || [])];
         const existingIndex = schedules.findIndex((s) => s.scheduled_date === date);
 
@@ -263,13 +268,13 @@ export default function Form({ order, suppliersRm, suppliersOhp, items }) {
             schedules[existingIndex] = {
                 ...schedules[existingIndex],
                 qty,
-                ohp_supplier_id: schedules[existingIndex].ohp_supplier_id || ohp,
+                ohp_supplier_code: schedules[existingIndex].ohp_supplier_code || ohp,
             };
         } else {
             schedules.push({
                 scheduled_date: date,
                 qty,
-                ohp_supplier_id: ohp,
+                ohp_supplier_code: ohp,
             });
         }
 
@@ -296,8 +301,8 @@ export default function Form({ order, suppliersRm, suppliersOhp, items }) {
                 byDay[day] = {
                     scheduled_date: dateForDay(month, day),
                     qty: s.qty,
-                    ohp_supplier_id:
-                        s.ohp_supplier_id || defaultOhpForItem(items, item.item_id),
+                    ohp_supplier_code:
+                        s.ohp_supplier_code || defaultOhpForItem(itemDefaults, item.item_number),
                 };
             });
             return {
@@ -330,15 +335,17 @@ export default function Form({ order, suppliersRm, suppliersOhp, items }) {
                     <div className="ui-panel animate-fade-up p-5 sm:p-6">
                         <h3 className="mb-4 font-display font-semibold text-ink">Header PO</h3>
                         <div className="grid gap-4 md:grid-cols-2">
-                            <div>
-                                <InputLabel value="No. PO" />
-                                <TextInput
-                                    className="mt-1 w-full"
-                                    value={data.po_number}
-                                    onChange={(e) => setData('po_number', e.target.value)}
-                                />
-                                <InputError message={errors.po_number} className="mt-1" />
-                            </div>
+                            {editing && (
+                                <div>
+                                    <InputLabel value="No. PO" />
+                                    <TextInput
+                                        className="mt-1 w-full"
+                                        value={data.po_number}
+                                        onChange={(e) => setData('po_number', e.target.value)}
+                                    />
+                                    <InputError message={errors.po_number} className="mt-1" />
+                                </div>
+                            )}
                             <div>
                                 <InputLabel value="Due Date" />
                                 <TextInput
@@ -359,19 +366,17 @@ export default function Form({ order, suppliersRm, suppliersOhp, items }) {
                             </div>
                             <div>
                                 <InputLabel value="Supplier Raw Material" />
-                                <select
-                                    className="mt-1 w-full rounded-md border-line"
-                                    value={data.supplier_rm_id}
-                                    onChange={(e) => setData('supplier_rm_id', e.target.value)}
-                                >
-                                    <option value="">Pilih supplier</option>
-                                    {suppliersRm.map((s) => (
-                                        <option key={s.id} value={s.id}>
-                                            {s.code} — {s.name}
-                                        </option>
-                                    ))}
-                                </select>
-                                <InputError message={errors.supplier_rm_id} className="mt-1" />
+                                <SearchableSelect
+                                    options={qadSuppliers}
+                                    value={data.supplier_code}
+                                    placeholder="Ketik kode / nama supplier..."
+                                    getOptionValue={(s) => s.qad_code}
+                                    getOptionLabel={(s) =>
+                                        `${s.qad_code} — ${s.name}${s.city ? ` (${s.city})` : ''}`
+                                    }
+                                    onChange={(val) => setData('supplier_code', val)}
+                                />
+                                <InputError message={errors.supplier_code} className="mt-1" />
                             </div>
                             <div className="md:col-span-2">
                                 <InputLabel value="Catatan" />
@@ -411,21 +416,21 @@ export default function Form({ order, suppliersRm, suppliersOhp, items }) {
                                     <div>
                                         <InputLabel value="Item Number" />
                                         <SearchableSelect
-                                            options={items}
-                                            value={item.item_id}
+                                            options={qadItems}
+                                            value={item.item_number}
                                             placeholder="Ketik item number / deskripsi..."
-                                            getOptionValue={(i) => String(i.id)}
+                                            getOptionValue={(i) => i.qad_code}
                                             getOptionLabel={(i) =>
-                                                `${i.item_number} — ${i.description}`
+                                                `${i.qad_code} — ${i.description}`
                                             }
                                             autoFocus={focusItemIndex === itemIndex}
                                             focusToken={focusToken}
                                             onChange={(val) =>
-                                                updateItem(itemIndex, 'item_id', val)
+                                                updateItem(itemIndex, 'item_number', val)
                                             }
                                         />
                                         <InputError
-                                            message={errors[`items.${itemIndex}.item_id`]}
+                                            message={errors[`items.${itemIndex}.item_number`]}
                                             className="mt-1"
                                         />
                                     </div>
@@ -530,7 +535,7 @@ export default function Form({ order, suppliersRm, suppliersOhp, items }) {
                                         const left = remainingQty(item);
                                         return (
                                             <li key={index}>
-                                                {itemLabel(items, item.item_id)} — sisa{' '}
+                                                {itemLabel(qadItems, item.item_number)} — sisa{' '}
                                                 <span className="font-semibold">
                                                     {formatQty(left)} kg
                                                 </span>
@@ -600,7 +605,7 @@ export default function Form({ order, suppliersRm, suppliersOhp, items }) {
                                             const scheduled = scheduledTotal(item);
                                             const remaining = remainingQty(item);
                                             const matched = remaining === 0;
-                                            const ohpValue = rowOhp(item, items);
+                                            const ohpValue = rowOhp(item, itemDefaults);
                                             const zebra = rowIdx % 2 === 0 ? 'bg-surface' : 'bg-canvas-soft/80';
 
                                             return (
@@ -610,15 +615,13 @@ export default function Form({ order, suppliersRm, suppliersOhp, items }) {
                                                     >
                                                         <div
                                                             className="font-medium text-ink"
-                                                            title={itemLabel(items, item.item_id)}
+                                                            title={itemLabel(qadItems, item.item_number)}
                                                         >
-                                                            {itemShortLabel(items, item.item_id)}
+                                                            {itemShortLabel(qadItems, item.item_number)}
                                                         </div>
                                                         <div className="mt-0.5 max-w-[176px] truncate text-xs text-ink-muted">
-                                                            {items.find(
-                                                                (i) =>
-                                                                    String(i.id) ===
-                                                                    String(item.item_id),
+                                                            {qadItems.find(
+                                                                (i) => i.qad_code === item.item_number,
                                                             )?.description || ''}
                                                         </div>
                                                         <InputError
@@ -639,9 +642,12 @@ export default function Form({ order, suppliersRm, suppliersOhp, items }) {
                                                             }
                                                         >
                                                             <option value="">Pilih OHP</option>
-                                                            {suppliersOhp.map((s) => (
-                                                                <option key={s.id} value={s.id}>
-                                                                    {s.code} — {s.name}
+                                                            {qadSuppliersOhp.map((s) => (
+                                                                <option
+                                                                    key={s.qad_code}
+                                                                    value={s.qad_code}
+                                                                >
+                                                                    {s.qad_code} — {s.name}
                                                                 </option>
                                                             ))}
                                                         </select>
@@ -682,7 +688,7 @@ export default function Form({ order, suppliersRm, suppliersOhp, items }) {
                                                                     type="text"
                                                                     inputMode="numeric"
                                                                     autoComplete="off"
-                                                                    aria-label={`Qty ${itemShortLabel(items, item.item_id)} tanggal ${day}`}
+                                                                    aria-label={`Qty ${itemShortLabel(qadItems, item.item_number)} tanggal ${day}`}
                                                                     className={`no-spin w-full rounded border px-1 py-1.5 text-center text-xs tabular-nums focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand ${
                                                                         filled
                                                                             ? weekend

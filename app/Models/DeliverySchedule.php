@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Enums\ScheduleStatus;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class DeliverySchedule extends Model
@@ -58,9 +59,14 @@ class DeliverySchedule extends Model
         return $this->hasOne(DeliveryNote::class);
     }
 
+    public function receivings(): HasMany
+    {
+        return $this->hasMany(Receiving::class);
+    }
+
     public function receiving(): HasOne
     {
-        return $this->hasOne(Receiving::class);
+        return $this->hasOne(Receiving::class)->latestOfMany();
     }
 
     public function effectiveQty(): string

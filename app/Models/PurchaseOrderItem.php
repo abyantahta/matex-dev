@@ -13,6 +13,7 @@ class PurchaseOrderItem extends Model
         'item_id',
         'qty_ordered',
         'qty_confirmed',
+        'qad_line_number',
     ];
 
     protected function casts(): array
@@ -20,6 +21,7 @@ class PurchaseOrderItem extends Model
         return [
             'qty_ordered' => 'integer',
             'qty_confirmed' => 'integer',
+            'qad_line_number' => 'integer',
         ];
     }
 

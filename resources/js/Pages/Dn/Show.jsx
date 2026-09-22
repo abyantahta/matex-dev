@@ -6,13 +6,17 @@ import TextInput from '@/Components/TextInput';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { formatQty } from '@/utils/qty';
 import { Head, router, useForm, usePage } from '@inertiajs/react';
+import { useState } from 'react';
 
-export default function Show({ note, sjUrl }) {
-    const { auth } = usePage().props;
+export default function Show({ note, sjUrl, receivingEnabled }) {
+    const { auth, errors } = usePage().props;
     const role = auth.user.role;
     const status = note.delivery_schedule?.status;
     const planDate = note.delivery_schedule?.scheduled_date;
     const currentDeliveryDate = (note.delivery_date || planDate || '').slice(0, 10);
+    const [partialOpen, setPartialOpen] = useState(false);
+    const [receiveQty, setReceiveQty] = useState(String(note.remaining_qty));
+    const [receiveProcessing, setReceiveProcessing] = useState(false);
 
     const ohpForm = useForm({
         sj_document: null,
@@ -29,8 +33,17 @@ export default function Show({ note, sjUrl }) {
         Boolean(note.rm_sj_number || note.delivery_schedule?.rm_sj_number);
     const canOhp = role === 'supplier_ohp' && status === 'ship_confirmed' && !note.ohp_confirmation;
     const canReceive =
-        ['ppic', 'admin'].includes(role) && status === 'ohp_ok' && !note.receiving;
+        ['ppic', 'admin'].includes(role) && status === 'ohp_ok' && !note.is_fully_received;
     const canEditDate = role === 'supplier_rm' && status === 'planned';
+
+    const submitReceive = (qty) => {
+        setReceiveProcessing(true);
+        router.post(
+            route('receivings.store', note.id),
+            { received_qty: qty },
+            { preserveScroll: true, onFinish: () => setReceiveProcessing(false) },
+        );
+    };
 
     return (
         <AuthenticatedLayout
@@ -251,43 +264,113 @@ export default function Show({ note, sjUrl }) {
                         </section>
                     )}
 
-                    {canReceive && (
-                        <section className="rounded-xl border border-emerald-200 bg-emerald-50 p-5">
-                            <h3 className="font-semibold text-emerald-900">Receiving PPIC</h3>
-                            <p className="mt-1 text-sm text-emerald-800">
-                                Proses receiving akan langsung di-push ke QAD (stub).
+                    {canReceive && !receivingEnabled && (
+                        <section className="rounded-xl border border-rose-200 bg-rose-50 p-5">
+                            <h3 className="font-semibold text-rose-900">
+                                Receiving Sementara Dinonaktifkan
+                            </h3>
+                            <p className="mt-1 text-sm text-rose-800">
+                                Fitur ini dimatikan lewat config — jangan proses receiving
+                                barang ini dulu sampai diaktifkan kembali.
                             </p>
-                            <PrimaryButton
-                                className="mt-4 bg-emerald-700 hover:bg-emerald-800"
-                                onClick={() =>
-                                    router.post(route('receivings.store', note.id), {
-                                        received_qty: note.qty,
-                                    })
-                                }
-                            >
-                                Receive & Push QAD
-                            </PrimaryButton>
                         </section>
                     )}
 
-                    {note.receiving && (
-                        <section className="ui-panel p-5">
-                            <h3 className="font-semibold text-ink">Receiving</h3>
-                            <dl className="mt-3 grid gap-2 text-sm sm:grid-cols-2">
-                                <div>
-                                    <dt className="text-ink-muted">Qty Received</dt>
-                                    <dd className="font-medium">{formatQty(note.receiving.received_qty)} kg</dd>
+                    {canReceive && receivingEnabled && (
+                        <section className="rounded-xl border border-emerald-200 bg-emerald-50 p-5">
+                            <h3 className="font-semibold text-emerald-900">Receiving PPIC</h3>
+                            <p className="mt-1 text-sm text-emerald-800">
+                                Proses receiving akan langsung di-push ke QAD.
+                            </p>
+                            {note.received_qty > 0 && (
+                                <p className="mt-2 text-sm font-medium text-emerald-900">
+                                    Sudah diterima {formatQty(note.received_qty)} kg dari{' '}
+                                    {formatQty(note.qty)} kg — sisa {formatQty(note.remaining_qty)} kg
+                                </p>
+                            )}
+
+                            {!partialOpen ? (
+                                <div className="mt-4 flex items-center gap-3">
+                                    <PrimaryButton
+                                        className="bg-emerald-700 hover:bg-emerald-800"
+                                        disabled={receiveProcessing}
+                                        onClick={() => submitReceive(note.remaining_qty)}
+                                    >
+                                        {note.received_qty > 0
+                                            ? `Receive Sisa (${formatQty(note.remaining_qty)} kg) + Push QAD`
+                                            : `Receive Penuh (${formatQty(note.remaining_qty)} kg) + Push QAD`}
+                                    </PrimaryButton>
+                                    <button
+                                        type="button"
+                                        className="text-xs text-emerald-800 underline hover:text-emerald-900"
+                                        onClick={() => setPartialOpen(true)}
+                                    >
+                                        Qty beda?
+                                    </button>
                                 </div>
-                                <div>
-                                    <dt className="text-ink-muted">QAD Status</dt>
-                                    <dd>
-                                        <StatusBadge
-                                            type="qad"
-                                            value={note.receiving.qad_status}
+                            ) : (
+                                <div className="mt-4 flex flex-wrap items-end gap-3">
+                                    <div>
+                                        <InputLabel value="Qty Diterima (kg)" />
+                                        <TextInput
+                                            type="text"
+                                            inputMode="numeric"
+                                            className="mt-1 w-32"
+                                            autoFocus
+                                            value={receiveQty}
+                                            onChange={(e) => setReceiveQty(e.target.value)}
                                         />
-                                    </dd>
+                                        <InputError message={errors?.received_qty} className="mt-1" />
+                                    </div>
+                                    <button
+                                        type="button"
+                                        className="rounded-md border border-line px-3 py-2 text-sm"
+                                        onClick={() => setPartialOpen(false)}
+                                    >
+                                        Batal
+                                    </button>
+                                    <PrimaryButton
+                                        className="bg-emerald-700 hover:bg-emerald-800"
+                                        disabled={receiveProcessing}
+                                        onClick={() => submitReceive(receiveQty)}
+                                    >
+                                        Receive & Push QAD
+                                    </PrimaryButton>
                                 </div>
-                            </dl>
+                            )}
+                        </section>
+                    )}
+
+                    {note.receivings?.length > 0 && (
+                        <section className="ui-panel p-5">
+                            <h3 className="font-semibold text-ink">
+                                Receiving {note.is_fully_received ? '(Lunas)' : '(Parsial)'}
+                            </h3>
+                            <p className="mt-1 text-sm text-ink-muted">
+                                Total diterima {formatQty(note.received_qty)} kg dari{' '}
+                                {formatQty(note.qty)} kg
+                                {!note.is_fully_received &&
+                                    ` — sisa ${formatQty(note.remaining_qty)} kg`}
+                            </p>
+                            <div className="mt-3 divide-y divide-line">
+                                {note.receivings.map((r) => (
+                                    <div
+                                        key={r.id}
+                                        className="flex items-center justify-between py-2 text-sm"
+                                    >
+                                        <div>
+                                            <span className="font-medium">
+                                                {formatQty(r.received_qty)} kg
+                                            </span>
+                                            <span className="ms-2 text-ink-muted">
+                                                oleh {r.receiver?.name} ·{' '}
+                                                {new Date(r.received_at).toLocaleString('id-ID')}
+                                            </span>
+                                        </div>
+                                        <StatusBadge type="qad" value={r.qad_status} />
+                                    </div>
+                                ))}
+                            </div>
                         </section>
                     )}
             </div>

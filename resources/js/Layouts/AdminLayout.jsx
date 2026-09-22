@@ -46,7 +46,7 @@ export default function AdminLayout({ title, description, actions, children }) {
                         })}
                     </div>
 
-                    {route().current('admin.companies.*') && supplierQuickLinks.length > 0 && (
+                    {route().current('admin.qad-suppliers.*') && supplierQuickLinks.length > 0 && (
                         <div className="flex flex-wrap items-center gap-2">
                             <span className="text-[0.625rem] font-semibold uppercase tracking-[0.14em] text-ink-faint">
                                 Filter supplier

@@ -13,8 +13,16 @@ class ReceiveRequest extends FormRequest
 
     public function rules(): array
     {
+        $dn = $this->route('delivery_note');
+        $remaining = $dn ? $dn->remaining_qty : null;
+
         return [
-            'received_qty' => ['nullable', 'integer', 'gt:0'],
+            'received_qty' => [
+                'nullable',
+                'integer',
+                'gt:0',
+                $remaining !== null ? "max:{$remaining}" : 'max:999999999',
+            ],
             'notes' => ['nullable', 'string', 'max:1000'],
         ];
     }

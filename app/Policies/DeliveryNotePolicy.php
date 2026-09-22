@@ -65,8 +65,13 @@ class DeliveryNotePolicy
 
     public function receive(User $user, DeliveryNote $deliveryNote): bool
     {
+        // Kill switch for receivePurchaseOrder — see config/qad.php.
+        if (! config('qad.receiving_enabled')) {
+            return false;
+        }
+
         return $user->hasRole(UserRole::Ppic, UserRole::Admin)
             && $deliveryNote->deliverySchedule->status === ScheduleStatus::OhpOk
-            && $deliveryNote->receiving === null;
+            && ! $deliveryNote->is_fully_received;
     }
 }

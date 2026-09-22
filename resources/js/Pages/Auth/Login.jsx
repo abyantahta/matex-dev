@@ -31,17 +31,6 @@ export default function Login({ status, canResetPassword }) {
                 </div>
             )}
 
-            <div className="mb-5 rounded-panel border border-brand-line bg-brand-muted/70 p-3.5 text-xs text-brand-deep">
-                <p className="font-display text-sm font-semibold">Demo accounts</p>
-                <p className="mt-0.5 text-ink-muted">password: password</p>
-                <ul className="mt-2 space-y-1 text-ink-soft">
-                    <li>dita@matex.test — Purchasing</li>
-                    <li>rm@matex.test — Supplier RM</li>
-                    <li>ohp@matex.test — Supplier OHP</li>
-                    <li>ppic@matex.test — PPIC</li>
-                </ul>
-            </div>
-
             <form onSubmit={submit} className="space-y-4">
                 <div>
                     <InputLabel htmlFor="email" value="Email" />

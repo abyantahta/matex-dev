@@ -15,17 +15,22 @@ class ReceivingController extends Controller
 {
     public function index(): Response
     {
+        // status stays OhpOk until a DN's cumulative received qty reaches
+        // its full qty (see ReceiveToQad), so this alone already excludes
+        // fully-received DNs while still surfacing partially-received ones
+        // for their remainder.
         $ready = DeliveryNote::query()
             ->with([
                 'purchaseOrder.supplierRm',
                 'purchaseOrderItem.item',
                 'deliverySchedule.ohpSupplier',
                 'ohpConfirmation',
+                'receivings',
             ])
             ->whereHas('deliverySchedule', fn ($q) => $q->where('status', ScheduleStatus::OhpOk))
-            ->whereDoesntHave('receiving')
             ->latest()
-            ->get();
+            ->get()
+            ->each->append(['received_qty', 'remaining_qty', 'is_fully_received']);
 
         $history = Receiving::query()
             ->with([
@@ -39,6 +44,7 @@ class ReceivingController extends Controller
         return Inertia::render('Receiving/Index', [
             'ready' => $ready,
             'history' => $history,
+            'receivingEnabled' => (bool) config('qad.receiving_enabled'),
         ]);
     }
 
@@ -47,13 +53,21 @@ class ReceivingController extends Controller
         DeliveryNote $deliveryNote,
         ReceiveToQad $action,
     ): RedirectResponse {
-        $action->execute(
+        $receiving = $action->execute(
             $deliveryNote,
             $request->user(),
             $request->validated('received_qty'),
             $request->validated('notes')
         );
 
-        return back()->with('success', 'Receiving berhasil dan telah di-push ke QAD (stub).');
+        $message = $deliveryNote->fresh()->is_fully_received
+            ? 'Receiving selesai (lunas) dan telah di-push ke QAD.'
+            : 'Receiving parsial dicatat dan telah di-push ke QAD.';
+
+        if ($receiving->qad_status?->value === 'failed') {
+            $message = 'Receiving tercatat, tapi push ke QAD gagal — cek detail.';
+        }
+
+        return back()->with('success', $message);
     }
 }

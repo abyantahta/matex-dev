@@ -11,7 +11,8 @@ use App\Policies\DeliverySchedulePolicy;
 use App\Policies\ForecastPolicy;
 use App\Policies\PurchaseOrderPolicy;
 use App\Services\Qad\QadClientInterface;
-use App\Services\Qad\StubQadClient;
+use App\Services\Qad\QadReceivingClient;
+use App\Services\Qad\QadSoapClient;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Vite;
 use Illuminate\Support\ServiceProvider;
@@ -21,7 +22,8 @@ class AppServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
-        $this->app->bind(QadClientInterface::class, StubQadClient::class);
+        $this->app->bind(QadClientInterface::class, QadReceivingClient::class);
+        $this->app->bind(QadSoapClient::class, fn () => QadSoapClient::fromConfig());
     }
 
     public function boot(): void

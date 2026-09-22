@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\PoStatus;
+use App\Enums\QadSyncStatus;
 use App\Enums\ScheduleStatus;
 use App\Enums\UserRole;
 use Illuminate\Database\Eloquent\Builder;
@@ -23,6 +24,10 @@ class PurchaseOrder extends Model
         'submitted_at',
         'rm_confirmed_at',
         'purchasing_approved_at',
+        'qad_status',
+        'qad_po_number',
+        'qad_payload',
+        'qad_response',
     ];
 
     protected function casts(): array
@@ -33,6 +38,9 @@ class PurchaseOrder extends Model
             'submitted_at' => 'datetime',
             'rm_confirmed_at' => 'datetime',
             'purchasing_approved_at' => 'datetime',
+            'qad_status' => QadSyncStatus::class,
+            'qad_payload' => 'array',
+            'qad_response' => 'array',
         ];
     }
 

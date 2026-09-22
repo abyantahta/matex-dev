@@ -2,7 +2,8 @@
  * Konfigurasi menu Master Data — tambah/ubah item di sini saja
  * agar nav utama & tab admin tetap sinkron.
  *
- * Diakses Purchasing (Mbak Dita) & Admin. Users tetap Admin saja.
+ * Diakses Purchasing (Mbak Dita) & Admin. Users kini juga bisa dikelola
+ * Purchasing (kecuali akun Admin — lihat UserController).
  */
 export const MASTER_DATA_ROLES = ['admin', 'purchasing'];
 
@@ -24,31 +25,39 @@ export const MASTER_NAV_ITEMS = [
         roles: ['admin', 'purchasing'],
     },
     {
+        key: 'qad-items',
+        route: 'admin.qad-items.index',
+        label: 'Item Master QAD',
+        description: 'Cache item master hasil sync dari QAD',
+        match: 'admin.qad-items.*',
+        roles: ['admin', 'purchasing'],
+    },
+    {
         key: 'suppliers',
-        route: 'admin.companies.index',
+        route: 'admin.qad-suppliers.index',
         label: 'Suppliers',
-        description: 'RM, OHP, dan company lain',
-        match: 'admin.companies.*',
+        description: 'Master supplier RM & OHP, tersinkron dari QAD',
+        match: 'admin.qad-suppliers.*',
         params: {},
         roles: ['admin', 'purchasing'],
     },
     {
         key: 'supplier-rm',
-        route: 'admin.companies.index',
+        route: 'admin.qad-suppliers.index',
         label: 'Supplier RM',
         description: 'Supplier raw material',
-        match: 'admin.companies.*',
-        params: { type: 'raw_mat' },
+        match: 'admin.qad-suppliers.*',
+        params: { category: 'raw_mat' },
         group: 'suppliers',
         roles: ['admin', 'purchasing'],
     },
     {
         key: 'supplier-ohp',
-        route: 'admin.companies.index',
+        route: 'admin.qad-suppliers.index',
         label: 'Supplier OHP',
         description: 'Supplier OH Part',
-        match: 'admin.companies.*',
-        params: { type: 'ohp' },
+        match: 'admin.qad-suppliers.*',
+        params: { category: 'ohp' },
         group: 'suppliers',
         roles: ['admin', 'purchasing'],
     },
@@ -66,7 +75,7 @@ export const MASTER_NAV_ITEMS = [
         label: 'Users',
         description: 'Akun & role portal',
         match: 'admin.users.*',
-        roles: ['admin'],
+        roles: ['admin', 'purchasing'],
     },
 ];
 
@@ -97,17 +106,17 @@ export function isMasterNavActive(item) {
     }
 
     if (typeof window === 'undefined') {
-        return !item.params?.type;
+        return !item.params?.category;
     }
 
-    const type = new URL(window.location.href).searchParams.get('type');
+    const category = new URL(window.location.href).searchParams.get('category');
 
-    if (item.params?.type) {
-        return type === item.params.type;
+    if (item.params?.category) {
+        return category === item.params.category;
     }
 
     if (item.key === 'suppliers') {
-        return !type;
+        return !category;
     }
 
     return true;

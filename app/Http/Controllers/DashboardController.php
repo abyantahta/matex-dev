@@ -49,8 +49,10 @@ class DashboardController extends Controller
                     ->whereHas('ohpConfirmation')->count(),
             ],
             UserRole::Ppic => [
-                'ready_receive' => DeliveryNote::whereHas('deliverySchedule', fn ($q) => $q->where('status', ScheduleStatus::OhpOk))
-                    ->whereDoesntHave('receiving')->count(),
+                // status stays OhpOk until a DN is fully received (partial
+                // receipts don't flip it), so this alone covers "not yet
+                // fully received" without needing a whereDoesntHave here.
+                'ready_receive' => DeliveryNote::whereHas('deliverySchedule', fn ($q) => $q->where('status', ScheduleStatus::OhpOk))->count(),
                 'received' => Receiving::count(),
             ],
             default => [],

@@ -19,8 +19,24 @@ class ReceiveToQad
 
     public function __construct(private QadClientInterface $qad) {}
 
+    /**
+     * Records one receipt against a DN — can be partial (goods arriving in
+     * installments across several trucks/dates). Each call pushes only the
+     * qty received THIS time to QAD (receivePurchaseOrder reduces QAD's own
+     * open qty incrementally), and the schedule only flips to Received once
+     * the DN's cumulative received qty reaches its full qty.
+     */
     public function execute(DeliveryNote $dn, User $user, ?float $receivedQty = null, ?string $notes = null): Receiving
     {
+        // Same kill switch as DeliveryNotePolicy::receive() — checked here
+        // too since this action could be invoked directly (tinker, a future
+        // feature) bypassing the policy.
+        if (! config('qad.receiving_enabled')) {
+            throw ValidationException::withMessages([
+                'status' => 'Receiving sementara dinonaktifkan.',
+            ]);
+        }
+
         $schedule = $dn->deliverySchedule;
 
         if ($schedule->status !== ScheduleStatus::OhpOk) {
@@ -29,15 +45,24 @@ class ReceiveToQad
             ]);
         }
 
-        if ($dn->receiving) {
+        $alreadyReceived = (int) $dn->receivings()->sum('received_qty');
+        $remaining = (int) $dn->qty - $alreadyReceived;
+
+        if ($remaining <= 0) {
             throw ValidationException::withMessages([
-                'status' => 'DN sudah di-receive.',
+                'status' => 'DN sudah diterima penuh.',
             ]);
         }
 
-        return DB::transaction(function () use ($dn, $schedule, $user, $receivedQty, $notes) {
-            $qty = $receivedQty ?? (float) $dn->qty;
+        $qty = $receivedQty !== null ? (float) $receivedQty : (float) $remaining;
 
+        if ($qty > $remaining) {
+            throw ValidationException::withMessages([
+                'received_qty' => "Qty melebihi sisa yang belum diterima ({$remaining} kg).",
+            ]);
+        }
+
+        return DB::transaction(function () use ($dn, $schedule, $user, $qty, $notes, $alreadyReceived) {
             $receiving = Receiving::create([
                 'delivery_note_id' => $dn->id,
                 'delivery_schedule_id' => $schedule->id,
@@ -56,12 +81,14 @@ class ReceiveToQad
                 'qad_response' => $result['response'],
             ]);
 
-            $schedule->update([
-                'status' => ScheduleStatus::Received,
-            ]);
+            $isFullyReceived = ($alreadyReceived + $qty) >= (int) $dn->qty;
+
+            if ($isFullyReceived) {
+                $schedule->update(['status' => ScheduleStatus::Received]);
+            }
 
             $po = $dn->purchaseOrder->fresh(['schedules']);
-            $allReceived = $po->schedules->every(
+            $allReceived = $isFullyReceived && $po->schedules->every(
                 fn ($s) => $s->status === ScheduleStatus::Received
             );
 
@@ -77,13 +104,17 @@ class ReceiveToQad
                     "Receiving DN {$dn->dn_number} — seluruh jadwal selesai"
                 );
             } else {
+                $note = $isFullyReceived
+                    ? "Receiving DN {$dn->dn_number} (lunas) dan push ke QAD"
+                    : "Receiving parsial DN {$dn->dn_number} — {$qty} kg (sisa ".max(0, (int) $dn->qty - $alreadyReceived - $qty)." kg) dan push ke QAD";
+
                 $this->logStatus(
                     $po,
                     $po->status,
                     $po->status,
                     'received',
                     $user,
-                    "Receiving DN {$dn->dn_number} dan push ke QAD"
+                    $note
                 );
             }
 

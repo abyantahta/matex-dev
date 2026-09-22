@@ -6,6 +6,7 @@ use App\Enums\UserRole;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class DeliveryNote extends Model
@@ -50,9 +51,35 @@ class DeliveryNote extends Model
         return $this->hasOne(OhpConfirmation::class);
     }
 
+    /**
+     * A DN can be received across several partial receipts (goods arriving
+     * in installments) — this is the full history, source of truth for how
+     * much has actually come in.
+     */
+    public function receivings(): HasMany
+    {
+        return $this->hasMany(Receiving::class);
+    }
+
+    /** Most recent receipt, if any — for a quick "last touched" display. */
     public function receiving(): HasOne
     {
-        return $this->hasOne(Receiving::class);
+        return $this->hasOne(Receiving::class)->latestOfMany();
+    }
+
+    public function getReceivedQtyAttribute(): int
+    {
+        return (int) $this->receivings->sum('received_qty');
+    }
+
+    public function getRemainingQtyAttribute(): int
+    {
+        return max(0, (int) $this->qty - $this->received_qty);
+    }
+
+    public function getIsFullyReceivedAttribute(): bool
+    {
+        return $this->remaining_qty <= 0;
     }
 
     public function scopeVisibleTo(Builder $query, User $user): Builder

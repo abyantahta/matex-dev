@@ -3,6 +3,8 @@
 use App\Http\Controllers\Admin\AdminDashboardController;
 use App\Http\Controllers\Admin\CompanyController;
 use App\Http\Controllers\Admin\ItemController;
+use App\Http\Controllers\Admin\QadItemController;
+use App\Http\Controllers\Admin\QadSupplierController;
 use App\Http\Controllers\Admin\SupplierDisciplineController;
 use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\BillingController;
@@ -72,7 +74,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     Route::get('billing', [BillingController::class, 'index'])->name('billing.index');
 
-    // Master data: Purchasing (Mbak Dita) + Admin. Users tetap Admin saja.
+    // Master data: Purchasing (Mbak Dita) + Admin. Users kini juga bisa
+    // dikelola Purchasing (kecuali akun Admin — lihat UserController).
     Route::middleware('role:admin,purchasing')->prefix('admin')->name('admin.')->group(function () {
         Route::get('/', AdminDashboardController::class)->name('dashboard');
         Route::resource('companies', CompanyController::class)->except(['show']);
@@ -80,9 +83,26 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('discipline', [SupplierDisciplineController::class, 'index'])
             ->name('discipline.index');
 
-        Route::middleware('role:admin')->group(function () {
-            Route::resource('users', UserController::class)->except(['show']);
+        Route::prefix('qad-items')->name('qad-items.')->group(function () {
+            Route::get('/', [QadItemController::class, 'index'])->name('index');
+            Route::post('/sync', [QadItemController::class, 'sync'])
+                ->middleware('throttle:3,1')
+                ->name('sync');
         });
+
+        Route::prefix('qad-suppliers')->name('qad-suppliers.')->group(function () {
+            Route::get('/', [QadSupplierController::class, 'index'])->name('index');
+            Route::post('/sync', [QadSupplierController::class, 'sync'])
+                ->middleware('throttle:3,1')
+                ->name('sync');
+            Route::patch('/{qad_supplier}/category', [QadSupplierController::class, 'updateCategory'])
+                ->name('update-category');
+        });
+
+        // Users: Admin full akses; Purchasing bisa kelola PPIC/Purchasing/
+        // Supplier RM/Supplier OHP tapi tidak bisa menyentuh akun Admin
+        // (ditegakkan di StoreUserRequest/UpdateUserRequest/UserController).
+        Route::resource('users', UserController::class)->except(['show']);
     });
 
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
