@@ -6,6 +6,7 @@ import TextInput from '@/Components/TextInput';
 import Timeline from '@/Components/Timeline';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { formatQty, isQtyInput, roundQty, toNum } from '@/utils/qty';
+import { encodeUploadField, formatFileSize } from '@/utils/upload';
 import {
     isWeekendDay,
     weekendCellClass,
@@ -14,7 +15,7 @@ import {
     weekdayLabel,
 } from '@/utils/calendar';
 import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 function pad2(n) {
     return String(n).padStart(2, '0');
@@ -95,22 +96,66 @@ function dayOfDate(dateStr) {
 }
 
 /**
+ * Draft awal konfirmasi RM: { [itemId]: { [day]: 'qty' } } dari jadwal yang
+ * tersimpan (qty_confirmed terakhir, atau rencana Purchasing).
+ */
+function initialCellDrafts(order, dueMonth) {
+    const cells = {};
+    if (!dueMonth) {
+        return cells;
+    }
+    (order.schedules || []).forEach((s) => {
+        const day = dayOfDate(s.scheduled_date);
+        if (!day || day < 1 || day > dueMonth.days) {
+            return;
+        }
+        const itemId = String(s.purchase_order_item_id);
+        const qty = toNum(s.qty_confirmed ?? s.qty);
+        cells[itemId] = cells[itemId] || {};
+        cells[itemId][day] = String(roundQty(toNum(cells[itemId][day]) + qty));
+    });
+    return cells;
+}
+
+function cellDraftsToSchedules(cells, dueMonth) {
+    const out = [];
+    Object.entries(cells).forEach(([itemId, days]) => {
+        Object.entries(days).forEach(([day, qty]) => {
+            if (qty === '' || qty === null || qty === undefined) {
+                return;
+            }
+            out.push({
+                purchase_order_item_id: Number(itemId),
+                scheduled_date: dateForDay(dueMonth, Number(day)),
+                qty_confirmed: toNum(qty),
+            });
+        });
+    });
+    return out;
+}
+
+function itemDraftTotal(cells, itemId) {
+    return roundQty(
+        Object.values(cells?.[String(itemId)] || {}).reduce((sum, v) => sum + toNum(v), 0),
+    );
+}
+
+/**
  * Matrix jadwal: baris = part, kolom = tanggal 1–N bulan due date.
  * mode: 'edit' | 'review' | 'view'
+ * Di mode edit, SEMUA cell tanggal bisa diisi RM (mix & match tanggal/qty);
+ * cellDrafts = { [itemId]: { [day]: 'qty' } }.
  */
 function ScheduleMatrix({
     order,
     dueMonth,
     mode,
-    scheduleDrafts,
+    cellDrafts,
     onChangeQty,
-    onChangeDate,
     showRmChanges,
     hideInternalHistory,
 }) {
     const dayColumns = Array.from({ length: dueMonth.days }, (_, i) => i + 1);
-    const monthMinDate = dateForDay(dueMonth, 1);
-    const monthMaxDate = dateForDay(dueMonth, dueMonth.days);
 
     const rows = useMemo(() => {
         return (order.items || []).map((item) => {
@@ -119,13 +164,7 @@ function ScheduleMatrix({
             );
             const byDay = {};
             itemSchedules.forEach((s) => {
-                // In edit mode a schedule renders under whatever date is
-                // currently in its draft (so moving it live re-renders the
-                // cell under the new day column), not the original saved date.
-                const draft = scheduleDrafts?.find((d) => String(d.id) === String(s.id));
-                const effectiveDate =
-                    mode === 'edit' && draft?.scheduled_date ? draft.scheduled_date : s.scheduled_date;
-                const day = dayOfDate(effectiveDate);
+                const day = dayOfDate(s.scheduled_date);
                 if (!day || day < 1 || day > dueMonth.days) {
                     return;
                 }
@@ -138,17 +177,12 @@ function ScheduleMatrix({
                 itemSchedules.reduce((sum, s) => sum + toNum(s.qty), 0),
             );
 
-            const confirmedTotal = roundQty(
-                itemSchedules.reduce((sum, s) => {
-                    const draft = scheduleDrafts?.find(
-                        (d) => String(d.id) === String(s.id),
-                    );
-                    const val = draft
-                        ? draft.qty_confirmed
-                        : (s.qty_confirmed ?? (mode === 'edit' ? s.qty : null));
-                    return sum + toNum(val);
-                }, 0),
-            );
+            const confirmedTotal =
+                mode === 'edit'
+                    ? itemDraftTotal(cellDrafts, item.id)
+                    : roundQty(
+                          itemSchedules.reduce((sum, s) => sum + toNum(s.qty_confirmed), 0),
+                      );
 
             const ohpName =
                 itemSchedules[0]?.ohp_supplier?.name ||
@@ -164,7 +198,7 @@ function ScheduleMatrix({
                 ohpName,
             };
         });
-    }, [order.items, order.schedules, dueMonth, scheduleDrafts, mode]);
+    }, [order.items, order.schedules, dueMonth, cellDrafts, mode]);
 
     if (rows.length === 0) {
         return (
@@ -259,15 +293,18 @@ function ScheduleMatrix({
                                     </td>
                                 )}
                                 <td className="border-b border-r border-line px-2 py-2 text-right font-semibold tabular-nums text-ink">
-                                    {formatQty(displayConfirmed || ordered)}
+                                    {formatQty(
+                                        mode === 'edit' ? displayConfirmed : displayConfirmed || ordered,
+                                    )}
                                 </td>
                                 {showRmChanges && !hideInternalHistory && (
                                     <td className="border-b border-r border-line px-2 py-2 text-center">
                                         <ChangeBadge
                                             ordered={ordered}
                                             confirmed={
-                                                row.item.qty_confirmed ??
-                                                (mode === 'edit' ? row.confirmedTotal : null)
+                                                mode === 'edit'
+                                                    ? row.confirmedTotal
+                                                    : (row.item.qty_confirmed ?? row.confirmedTotal)
                                             }
                                         />
                                     </td>
@@ -276,6 +313,60 @@ function ScheduleMatrix({
                                     const schedule = row.byDay[day];
                                     const weekend = isWeekendDay(dueMonth, day);
                                     const weekendWash = weekendCellClass(dueMonth, day);
+
+                                    if (mode === 'edit') {
+                                        const planned = toNum(schedule?.qty);
+                                        const rawVal = cellDrafts?.[String(row.item.id)]?.[day];
+                                        const confirmedVal =
+                                            rawVal === undefined || rawVal === null ? '' : String(rawVal);
+                                        const confirmedNum = toNum(confirmedVal);
+                                        const filled = confirmedNum > 0;
+                                        const changed = roundQty(confirmedNum) !== roundQty(planned);
+                                        // Plan Purchasing yang dikosongkan RM: tampil sebagai
+                                        // angka dicoret + garis putus-putus, jelas bukan value aktual.
+                                        const droppedPlan = !filled && planned > 0;
+                                        const inputTone = droppedPlan
+                                            ? 'border-dashed border-amber-300 bg-transparent text-ink placeholder:text-ink-faint placeholder:line-through'
+                                            : filled && changed
+                                              ? 'border-amber-300 bg-amber-50 font-medium text-amber-950'
+                                              : filled
+                                                ? weekend
+                                                    ? 'border-rose-300 bg-rose-100 font-medium text-rose-900'
+                                                    : 'border-brand-line bg-brand-muted font-medium text-brand-deep'
+                                                : weekend
+                                                  ? 'border-transparent bg-rose-50/60 text-ink hover:border-line'
+                                                  : 'border-transparent bg-transparent text-ink hover:border-line';
+                                        return (
+                                            <td
+                                                key={day}
+                                                title={
+                                                    droppedPlan
+                                                        ? `${weekdayLabel(dueMonth, day)} · Rencana ${formatQty(planned)} kg — dikosongkan`
+                                                        : planned > 0
+                                                          ? `${weekdayLabel(dueMonth, day)} · Rencana ${formatQty(planned)} kg`
+                                                          : weekdayLabel(dueMonth, day)
+                                                }
+                                                className={`border-b border-line p-0.5 align-middle ${weekendWash}`}
+                                            >
+                                                <input
+                                                    type="text"
+                                                    inputMode="numeric"
+                                                    autoComplete="off"
+                                                    aria-label={`Qty confirm ${row.item.item?.item_number} tgl ${day}`}
+                                                    placeholder={planned > 0 ? formatQty(planned) : ''}
+                                                    className={`no-spin w-full rounded border px-1 py-1.5 text-center text-xs tabular-nums focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand ${inputTone}`}
+                                                    value={confirmedVal}
+                                                    onChange={(e) => {
+                                                        if (isQtyInput(e.target.value)) {
+                                                            onChangeQty(row.item.id, day, e.target.value);
+                                                        }
+                                                    }}
+                                                    onFocus={(e) => e.target.select()}
+                                                />
+                                            </td>
+                                        );
+                                    }
+
                                     if (!schedule) {
                                         return (
                                             <td
@@ -291,87 +382,10 @@ function ScheduleMatrix({
                                     }
 
                                     const planned = toNum(schedule.qty);
-                                    const draft = scheduleDrafts?.find(
-                                        (d) => String(d.id) === String(schedule.id),
-                                    );
-                                    const hasDraft = Boolean(draft);
-                                    const confirmedVal = hasDraft
-                                        ? draft.qty_confirmed
-                                        : (schedule.qty_confirmed ??
-                                          (mode === 'edit' ? schedule.qty : ''));
-                                    const confirmedNum = toNum(confirmedVal);
-                                    const cellBadge =
-                                        showRmChanges && mode !== 'edit'
-                                            ? qtyChangeBadge(planned, schedule.qty_confirmed)
-                                            : mode === 'edit'
-                                              ? qtyChangeBadge(planned, confirmedVal)
-                                              : null;
-
-                                    if (mode === 'edit') {
-                                        const filled = confirmedNum > 0;
-                                        const changed = roundQty(confirmedNum) !== roundQty(planned);
-                                        const dateVal =
-                                            draft?.scheduled_date ||
-                                            schedule.scheduled_date?.slice(0, 10) ||
-                                            '';
-                                        const dateChanged =
-                                            dateVal !== schedule.scheduled_date?.slice(0, 10);
-                                        return (
-                                            <td
-                                                key={day}
-                                                title={weekdayLabel(dueMonth, day)}
-                                                className={`border-b border-line p-0.5 align-middle ${weekendWash}`}
-                                            >
-                                                <div className="space-y-0.5">
-                                                    <input
-                                                        type="date"
-                                                        min={monthMinDate}
-                                                        max={monthMaxDate}
-                                                        aria-label={`Tanggal ${row.item.item?.item_number}`}
-                                                        title="Ganti tanggal pengiriman"
-                                                        className={`w-full rounded border px-0.5 py-0.5 text-center text-[10px] tabular-nums focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand ${
-                                                            dateChanged
-                                                                ? 'border-amber-300 bg-amber-50 text-amber-950'
-                                                                : 'border-line bg-surface text-ink-soft'
-                                                        }`}
-                                                        value={dateVal}
-                                                        onChange={(e) =>
-                                                            onChangeDate(schedule.id, e.target.value)
-                                                        }
-                                                    />
-                                                    <input
-                                                        type="text"
-                                                        inputMode="numeric"
-                                                        autoComplete="off"
-                                                        aria-label={`Qty confirm ${row.item.item?.item_number} tgl ${day}`}
-                                                        className={`no-spin w-full rounded border px-1 py-1.5 text-center text-xs tabular-nums focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand ${
-                                                            changed
-                                                                ? 'border-amber-300 bg-amber-50 font-medium text-amber-950'
-                                                                : filled
-                                                                  ? weekend
-                                                                    ? 'border-rose-300 bg-rose-100 font-medium text-rose-900'
-                                                                    : 'border-brand-line bg-brand-muted font-medium text-brand-deep'
-                                                                  : weekend
-                                                                    ? 'border-line bg-rose-50 text-ink'
-                                                                    : 'border-line bg-surface text-ink'
-                                                        }`}
-                                                        value={
-                                                            confirmedVal === null ||
-                                                            confirmedVal === undefined
-                                                                ? ''
-                                                                : String(confirmedVal)
-                                                        }
-                                                        onChange={(e) => {
-                                                            if (isQtyInput(e.target.value)) {
-                                                                onChangeQty(schedule.id, e.target.value);
-                                                            }
-                                                        }}
-                                                        onFocus={(e) => e.target.select()}
-                                                    />
-                                                </div>
-                                            </td>
-                                        );
-                                    }
+                                    const confirmedNum = toNum(schedule.qty_confirmed);
+                                    const cellBadge = showRmChanges
+                                        ? qtyChangeBadge(planned, schedule.qty_confirmed)
+                                        : null;
 
                                     const tone =
                                         cellBadge?.label === 'OK'
@@ -441,17 +455,12 @@ export default function Show({ order, hideInternalHistory = false }) {
         return initial;
     });
 
-    const rmForm = useForm({
-        items: order.items.map((item) => ({
-            id: item.id,
-            qty_confirmed: String(toNum(item.qty_confirmed ?? item.qty_ordered ?? '')),
-        })),
-        schedules: order.schedules.map((s) => ({
-            id: s.id,
-            qty_confirmed: String(toNum(s.qty_confirmed ?? s.qty ?? '')),
-            scheduled_date: s.scheduled_date?.slice(0, 10),
-        })),
-    });
+    const dueMonth = parseDueMonth(order.due_date);
+
+    // Draft konfirmasi RM per cell (item × tanggal). RM bebas mix & match:
+    // isi tanggal baru, kosongkan tanggal rencana, ubah qty — Purchasing yang
+    // menilai lagi lewat badge OK / Minus / Over saat approve.
+    const rmForm = useForm({ cells: initialCellDrafts(order, dueMonth) });
 
     const canEdit = role === 'purchasing' || role === 'admin';
     const canSubmit = canEdit && order.status === 'draft';
@@ -465,20 +474,80 @@ export default function Show({ order, hideInternalHistory = false }) {
     const signedPoRelevant = ['confirmed', 'in_progress', 'completed'].includes(order.status);
     const canUploadSignedPo = canEdit && signedPoRelevant;
 
-    const signedPoForm = useForm({ signed_po: null });
-    const submitSignedPo = (e) => {
-        e.preventDefault();
-        if (!signedPoForm.data.signed_po) {
+    const SIGNED_PO_MAX_MB = 10;
+    // File dikirim sebagai base64 (lihat utils/upload.js) agar tidak diblokir WAF.
+    const signedPoForm = useForm({ signed_po_base64: null, signed_po_name: null });
+    const [signedPoEncoding, setSignedPoEncoding] = useState(false);
+    const pickSignedPo = async (file) => {
+        signedPoForm.clearErrors('signed_po');
+        if (!file) {
+            signedPoForm.setData({ signed_po_base64: null, signed_po_name: null });
             return;
         }
+        const isPdf =
+            file.type === 'application/pdf' || /\.pdf$/i.test(file.name || '');
+        if (!isPdf) {
+            signedPoForm.setData({ signed_po_base64: null, signed_po_name: null });
+            signedPoForm.setError('signed_po', 'File harus berformat PDF.');
+            return;
+        }
+        if (file.size > SIGNED_PO_MAX_MB * 1024 * 1024) {
+            signedPoForm.setData({ signed_po_base64: null, signed_po_name: null });
+            signedPoForm.setError(
+                'signed_po',
+                `Ukuran file ${formatFileSize(file.size)} melebihi batas ${SIGNED_PO_MAX_MB} MB.`,
+            );
+            return;
+        }
+        setSignedPoEncoding(true);
+        try {
+            signedPoForm.setData(await encodeUploadField('signed_po', file));
+        } catch (err) {
+            signedPoForm.setError('signed_po', err?.message || 'Gagal membaca file.');
+        } finally {
+            setSignedPoEncoding(false);
+        }
+    };
+    // Respons non-Inertia (mis. HTML 403 dari WAF / 413 dari proxy) secara
+    // default ditampilkan Inertia sebagai modal iframe yang terlihat seperti
+    // "loading terus". Tangkap dan ubah jadi pesan error yang jelas.
+    const uploadingSignedPo = useRef(false);
+    const [signedPoGatewayError, setSignedPoGatewayError] = useState(null);
+    useEffect(
+        () =>
+            router.on('invalid', (event) => {
+                if (!uploadingSignedPo.current) {
+                    return;
+                }
+                event.preventDefault();
+                const status = event.detail?.response?.status;
+                setSignedPoGatewayError(
+                    status === 403
+                        ? 'Upload ditolak oleh firewall (HTTP 403) sebelum sampai ke server Matex. Hubungi admin.'
+                        : status === 413
+                          ? 'Ukuran file ditolak oleh server/proxy (HTTP 413).'
+                          : `Upload gagal di gateway (HTTP ${status ?? '?'}). Coba lagi atau hubungi admin.`,
+                );
+            }),
+        [],
+    );
+
+    const submitSignedPo = (e) => {
+        e.preventDefault();
+        if (!signedPoForm.data.signed_po_base64) {
+            return;
+        }
+        setSignedPoGatewayError(null);
+        uploadingSignedPo.current = true;
         signedPoForm.post(route('purchase-orders.upload-signed-po', order.id), {
-            forceFormData: true,
             preserveScroll: true,
-            onSuccess: () => signedPoForm.reset('signed_po'),
+            onSuccess: () => signedPoForm.reset(),
+            onFinish: () => {
+                uploadingSignedPo.current = false;
+            },
         });
     };
 
-    const dueMonth = parseDueMonth(order.due_date);
     const matrixMode = canConfirmRm ? 'edit' : showRmChanges || canApprove ? 'review' : 'view';
 
     const pendingDnSchedules = useMemo(
@@ -486,45 +555,41 @@ export default function Show({ order, hideInternalHistory = false }) {
         [order.schedules],
     );
 
-    const updateScheduleQty = (scheduleId, qty) => {
+    const updateCellQty = (itemId, day, qty) => {
         rmForm.setData((data) => {
-            const nextSchedules = data.schedules.map((s) =>
-                String(s.id) === String(scheduleId) ? { ...s, qty_confirmed: qty } : s,
-            );
-
-            const nextItems = order.items.map((item) => {
-                const itemScheduleIds = new Set(
-                    (order.schedules || [])
-                        .filter((s) => String(s.purchase_order_item_id) === String(item.id))
-                        .map((s) => String(s.id)),
-                );
-                const confirmed = roundQty(
-                    nextSchedules
-                        .filter((s) => itemScheduleIds.has(String(s.id)))
-                        .reduce((sum, s) => sum + toNum(s.qty_confirmed), 0),
-                );
-                return {
-                    id: item.id,
-                    qty_confirmed: String(confirmed > 0 ? confirmed : item.qty_ordered),
-                };
-            });
-
-            return {
-                ...data,
-                schedules: nextSchedules,
-                items: nextItems,
-            };
+            const key = String(itemId);
+            const itemCells = { ...(data.cells[key] || {}) };
+            if (qty === '' || toNum(qty) === 0) {
+                delete itemCells[day];
+            } else {
+                itemCells[day] = qty;
+            }
+            return { ...data, cells: { ...data.cells, [key]: itemCells } };
         });
     };
 
-    const updateScheduleDate = (scheduleId, date) => {
-        rmForm.setData((data) => ({
-            ...data,
-            schedules: data.schedules.map((s) =>
-                String(s.id) === String(scheduleId) ? { ...s, scheduled_date: date } : s,
-            ),
+    const rmItemsWithoutQty = useMemo(
+        () =>
+            canConfirmRm
+                ? order.items.filter((item) => itemDraftTotal(rmForm.data.cells, item.id) <= 0)
+                : [],
+        [canConfirmRm, order.items, rmForm.data.cells],
+    );
+
+    const submitRmConfirmation = () => {
+        if (!dueMonth) {
+            return;
+        }
+        rmForm.transform((data) => ({
+            schedules: cellDraftsToSchedules(data.cells, dueMonth),
         }));
+        rmForm.post(route('purchase-orders.confirm-rm', order.id), { preserveScroll: true });
     };
+
+    const rmErrorMessages = useMemo(
+        () => Array.from(new Set(Object.values(rmForm.errors || {}))),
+        [rmForm.errors],
+    );
 
     return (
         <AuthenticatedLayout
@@ -616,8 +681,8 @@ export default function Show({ order, hideInternalHistory = false }) {
                                         <div>
                                             <p className="font-semibold">
                                                 {order.has_signed_po
-                                                    ? 'Signed PO sudah diunggah'
-                                                    : 'Signed PO (BOD) belum diunggah'}
+                                                    ? 'Dokumen PO sudah diunggah'
+                                                    : 'Dokumen PO (belum diunggah)'}
                                             </p>
                                             {order.has_signed_po && (
                                                 <p className="mt-0.5 text-xs opacity-80">
@@ -648,28 +713,36 @@ export default function Show({ order, hideInternalHistory = false }) {
                                         >
                                             <input
                                                 type="file"
-                                                accept="application/pdf"
+                                                accept="application/pdf,.pdf"
                                                 className="text-xs"
                                                 onChange={(e) =>
-                                                    signedPoForm.setData(
-                                                        'signed_po',
-                                                        e.target.files?.[0] || null,
-                                                    )
+                                                    pickSignedPo(e.target.files?.[0] || null)
                                                 }
                                             />
                                             <PrimaryButton
                                                 className="bg-brand py-1.5 text-xs"
                                                 disabled={
                                                     signedPoForm.processing ||
-                                                    !signedPoForm.data.signed_po
+                                                    signedPoEncoding ||
+                                                    !signedPoForm.data.signed_po_base64
                                                 }
                                             >
-                                                {order.has_signed_po
-                                                    ? 'Ganti File'
-                                                    : 'Unggah Signed PO'}
+                                                {signedPoEncoding
+                                                    ? 'Membaca file…'
+                                                    : signedPoForm.processing
+                                                      ? `Mengunggah… ${signedPoForm.progress?.percentage ?? 0}%`
+                                                      : order.has_signed_po
+                                                      ? 'Ganti File'
+                                                      : 'Unggah Signed PO'}
                                             </PrimaryButton>
+                                            <span className="text-xs opacity-70">
+                                                PDF, maks. {SIGNED_PO_MAX_MB} MB
+                                            </span>
                                             <InputError
-                                                message={signedPoForm.errors.signed_po}
+                                                message={
+                                                    signedPoForm.errors.signed_po ||
+                                                    signedPoGatewayError
+                                                }
                                                 className="w-full text-xs"
                                             />
                                         </form>
@@ -695,7 +768,7 @@ export default function Show({ order, hideInternalHistory = false }) {
                             </div>
                             <p className="mb-4 text-sm text-ink-muted">
                                 {canConfirmRm
-                                    ? 'Isi qty confirmed (kg) di cell tanggal yang terjadwal. Bisa juga ganti tanggalnya (dalam bulan due date) kalau perlu geser jadwal kirim. Cell kuning = beda dari rencana Purchasing.'
+                                    ? 'Isi qty (kg) di tanggal mana pun dalam bulan due date — jadwal dari Purchasing hanya usulan awal, bebas dipindah, dipecah, atau diubah qty-nya. Cell kuning = beda dari rencana Purchasing. Kolom Status menunjukkan total per part sama / minus / over dari order.'
                                     : canApprove || showRmChanges
                                       ? 'Tabel perbandingan rencana vs konfirmasi RM. Hijau = OK, kuning = minus, merah = over.'
                                       : 'Alokasi qty per tanggal dalam bulan due date.'}
@@ -706,9 +779,8 @@ export default function Show({ order, hideInternalHistory = false }) {
                                     order={order}
                                     dueMonth={dueMonth}
                                     mode={matrixMode === 'edit' ? 'edit' : showRmChanges ? 'review' : 'view'}
-                                    scheduleDrafts={canConfirmRm ? rmForm.data.schedules : null}
-                                    onChangeQty={updateScheduleQty}
-                                    onChangeDate={updateScheduleDate}
+                                    cellDrafts={canConfirmRm ? rmForm.data.cells : null}
+                                    onChangeQty={updateCellQty}
                                     showRmChanges={showRmChanges || canConfirmRm}
                                     hideInternalHistory={hideInternalHistory}
                                 />
@@ -720,9 +792,11 @@ export default function Show({ order, hideInternalHistory = false }) {
 
                             {canConfirmRm && (
                                 <p className="mt-3 text-xs text-ink-muted">
-                                    Tip: hanya cell bertanggal jadwal yang bisa diisi — cell tersebut
-                                    juga bisa digeser ke tanggal lain (input tanggal kecil di atas
-                                    qty). Total Confirm per part dihitung otomatis dari cell.
+                                    Tip: angka <span className="line-through">dicoret</span> dengan
+                                    garis putus-putus = rencana Purchasing yang dikosongkan (bukan
+                                    qty aktual). Kosongkan cell untuk membatalkan tanggal itu, isi
+                                    cell lain untuk menambah tanggal kirim. Total Confirm per part
+                                    dihitung otomatis dari semua cell berisi.
                                 </p>
                             )}
                         </section>
@@ -928,18 +1002,26 @@ export default function Show({ order, hideInternalHistory = false }) {
                                 </h3>
                                 <p className="mt-1 text-sm text-brand-deep">
                                     Pastikan qty di tabel sudah sesuai (bilangan bulat, tanpa koma).
+                                    Setiap part minimal punya satu tanggal dengan qty.
                                 </p>
+                                {rmItemsWithoutQty.length > 0 && (
+                                    <p className="mt-2 text-sm text-amber-800">
+                                        Belum ada qty untuk:{' '}
+                                        {rmItemsWithoutQty
+                                            .map((item) => item.item?.item_number)
+                                            .join(', ')}
+                                    </p>
+                                )}
                                 <PrimaryButton
                                     className="mt-4 bg-brand"
-                                    disabled={rmForm.processing}
-                                    onClick={() =>
-                                        rmForm.post(route('purchase-orders.confirm-rm', order.id))
-                                    }
+                                    disabled={rmForm.processing || rmItemsWithoutQty.length > 0}
+                                    onClick={submitRmConfirmation}
                                 >
                                     Submit Konfirmasi
                                 </PrimaryButton>
-                                <InputError message={rmForm.errors.items} className="mt-2" />
-                                <InputError message={rmForm.errors.schedules} className="mt-2" />
+                                {rmErrorMessages.map((message) => (
+                                    <InputError key={message} message={message} className="mt-2" />
+                                ))}
                             </section>
                         )}
 

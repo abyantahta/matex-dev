@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\QadSyncStatus;
 use App\Enums\UserRole;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
@@ -67,9 +68,31 @@ class DeliveryNote extends Model
         return $this->hasOne(Receiving::class)->latestOfMany();
     }
 
+    /**
+     * Percobaan receiving terakhir yang ditolak QAD (jika ada) — dipakai
+     * untuk menampilkan alasan gagal di antrian "Siap Receive".
+     */
+    public function lastFailedReceiving(): HasOne
+    {
+        return $this->hasOne(Receiving::class)
+            ->where('qad_status', QadSyncStatus::Failed)
+            ->latestOfMany();
+    }
+
+    /**
+     * Hanya receiving yang sukses terposting di QAD yang dihitung — kalau QAD
+     * menolak, barang dianggap BELUM diterima dan DN tetap bisa di-receive.
+     */
     public function getReceivedQtyAttribute(): int
     {
-        return (int) $this->receivings->sum('received_qty');
+        return (int) $this->receivings
+            ->filter(fn (Receiving $r) => $r->isPosted())
+            ->sum('received_qty');
+    }
+
+    public function getQadErrorMessageAttribute(): ?string
+    {
+        return $this->lastFailedReceiving?->qad_error_message;
     }
 
     public function getRemainingQtyAttribute(): int

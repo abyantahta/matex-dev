@@ -1,3 +1,29 @@
+# Routes (Laravel + Inertia; server-side routing, pages in resources/js/Pages)
+
+| URL | Inertia page | Layout |
+|---|---|---|
+| /dashboard | Pages/Dashboard.jsx | AuthenticatedLayout |
+| /forecasts, /forecasts/create, /forecasts/{id} | Pages/Forecast/{Index,Form,Show}.jsx | AuthenticatedLayout |
+| /purchase-orders[/create|/{id}|/{id}/edit] | Pages/Po/{Index,Form,Show}.jsx | AuthenticatedLayout |
+| /delivery-notes[/{id}] | Pages/Dn/{Index,Show}.jsx | AuthenticatedLayout |
+| /receivings | Pages/Receiving/Index.jsx | AuthenticatedLayout |
+| /billing | Pages/Billing/Index.jsx | AuthenticatedLayout |
+| /admin (Master Data Overview) | Pages/Admin/Dashboard.jsx | AdminLayout |
+| /admin/qad-items | Pages/Admin/QadItems/Index.jsx | AdminLayout |
+| /admin/qad-suppliers | Pages/Admin/QadSuppliers/Index.jsx | AdminLayout |
+| /admin/companies[...] | Pages/Admin/Companies/{Index,Form}.jsx | AdminLayout |
+| /admin/discipline | Pages/Admin/Discipline/Index.jsx | AdminLayout |
+| /admin/users[...] | Pages/Admin/Users/{Index,Form}.jsx | AdminLayout |
+| /profile | Pages/Profile/Edit.jsx | AuthenticatedLayout |
+| /login, /register, ... | Pages/Auth/*.jsx | GuestLayout |
+
+## /admin — Master Data Overview (target page)
+Renders: stats grid (5 cards: ITEMS QAD 4542, SUPPLIER RM 0, SUPPLIER OHP 0, PURCHASE ORDERS 0, DELIVERY NOTES 0 — eyebrow label + big number) then 3 link cards (Item Master QAD / Suppliers / Kedisiplinan RM — title, description, count pill, 'Kelola →').
+
+
+### `routes/web.php`
+
+```php
 <?php
 
 use App\Http\Controllers\Admin\AdminDashboardController;
@@ -74,9 +100,6 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('receivings/{delivery_note}', [ReceivingController::class, 'store'])
         ->middleware('role:ppic,admin')
         ->name('receivings.store');
-    Route::post('receivings/{receiving}/retry-qad', [ReceivingController::class, 'retry'])
-        ->middleware('role:ppic,admin')
-        ->name('receivings.retry-qad');
 
     Route::get('billing', [BillingController::class, 'index'])->name('billing.index');
 
@@ -116,3 +139,5 @@ Route::middleware(['auth', 'verified'])->group(function () {
 });
 
 require __DIR__.'/auth.php';
+```
+

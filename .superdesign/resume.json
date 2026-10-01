@@ -1,0 +1,46 @@
+{
+  "version": 1,
+  "project": { "id": "c665e514-68c8-460a-92c4-4cfc63bb57c1", "title": "Matex — Master Data Overview", "team": "761bd9cc-9c78-43a4-8827-90610720f54a",
+    "canvas": "https://superdesign.dev/teams/761bd9cc-9c78-43a4-8827-90610720f54a/projects/c665e514-68c8-460a-92c4-4cfc63bb57c1" },
+  "targets": {
+    "/admin": {
+      "kind": "existing",
+      "entry": "resources/js/Pages/Admin/Dashboard.jsx",
+      "baselineDraftId": "14bdf21c-1e4e-42d4-84e5-ba26f0032099",
+      "activeDraftId": "793f949d-6b2b-4649-9034-c1c7848ebfc9",
+      "branches": [
+        { "draftId": "ef5e8f93-4c19-4429-ab1a-9923560d64ba", "label": "A — Icon tile + accent (5 stat cards satu baris, link card dengan tombol Kelola)" },
+        { "draftId": "793f949d-6b2b-4649-9034-c1c7848ebfc9", "label": "B — Hero KPI hijau + segmented strip, link card baris dengan tombol chevron" }
+      ],
+      "referenceIds": ["9ae45e05-f32e-4fa2-a467-123c45be7ee4"],
+      "model": "gemini-3.1-pro",
+      "contextFiles": [
+        ".superdesign/design-system.md",
+        "resources/js/Pages/Admin/Dashboard.jsx",
+        "resources/js/Layouts/AdminLayout.jsx",
+        "resources/js/Layouts/AuthenticatedLayout.jsx:114:203",
+        "resources/js/Layouts/AuthenticatedLayout.jsx:314:325",
+        "resources/js/Components/ApplicationLogo.jsx",
+        "resources/js/Components/NavLink.jsx",
+        "resources/js/Components/Dropdown.jsx",
+        "resources/js/Config/masterNav.js:10:80",
+        "resources/css/app.css",
+        "tailwind.config.js"
+      ],
+      "fingerprints": {
+        "resources/js/Pages/Admin/Dashboard.jsx": "c27f8f90fab05b42",
+        "resources/js/Layouts/AdminLayout.jsx": "ae8c520d806052d2",
+        "resources/js/Layouts/AuthenticatedLayout.jsx": "15cb3ee066840350",
+        "resources/js/Components/ApplicationLogo.jsx": "643fb5064b44782f",
+        "resources/js/Components/NavLink.jsx": "bdf178399e11c3a8",
+        "resources/js/Components/Dropdown.jsx": "0c7b94142cf66559",
+        "resources/js/Config/masterNav.js": "f0d2135fd23221fe",
+        "resources/css/app.css": "a2bd4836680c37ac",
+        "tailwind.config.js": "1e6cf84ffc1cba6e",
+        ".superdesign/design-system.md": "79e14c35e7264b7f"
+      },
+      "components": [],
+      "updatedAt": "2026-10-01T02:20:29+00:00"
+    }
+  }
+}

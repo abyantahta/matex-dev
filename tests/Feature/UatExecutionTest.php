@@ -189,8 +189,11 @@ class UatExecutionTest extends TestCase
         $purchasing = User::findOrFail(2);
 
         $this->actingAs($rm)->post(route('purchase-orders.confirm-rm', $po), [
-            'items' => [['id' => $po->items->first()->id, 'qty_confirmed' => 20]],
-            'schedules' => [['id' => $po->schedules->first()->id, 'qty_confirmed' => 20]],
+            'schedules' => [[
+                'purchase_order_item_id' => $po->items->first()->id,
+                'scheduled_date' => $po->schedules->first()->scheduled_date->toDateString(),
+                'qty_confirmed' => 20,
+            ]],
         ])->assertRedirect();
 
         $this->actingAs($purchasing)->post(route('purchase-orders.approve', $po))

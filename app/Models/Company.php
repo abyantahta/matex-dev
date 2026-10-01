@@ -39,9 +39,27 @@ class Company extends Model
         return $this->hasMany(Forecast::class, 'supplier_rm_id');
     }
 
+    public function purchaseOrdersAsRm(): HasMany
+    {
+        return $this->hasMany(PurchaseOrder::class, 'supplier_rm_id');
+    }
+
     public function scopeRawMat($query)
     {
         return $query->where('type', CompanyType::RawMat);
+    }
+
+    /**
+     * Supplier RM yang sudah bertransaksi: punya minimal satu PO yang sudah
+     * dikonfirmasi RM (baru ada plan tanggal kirim untuk dinilai).
+     * Companies di-provision dari QAD saat pertama dipakai di PO, jadi
+     * scope ini sekaligus menyaring company manual/dummy tanpa transaksi.
+     */
+    public function scopeTransactedAsRm($query)
+    {
+        return $query
+            ->rawMat()
+            ->whereHas('purchaseOrdersAsRm', fn ($q) => $q->whereNotNull('rm_confirmed_at'));
     }
 
     public function scopeOhp($query)

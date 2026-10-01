@@ -5,7 +5,11 @@ import SearchableSelect from '@/Components/SearchableSelect';
 import TextInput from '@/Components/TextInput';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { formatQty, isQtyInput, toNum } from '@/utils/qty';
+import { encodeUploadField, formatFileSize } from '@/utils/upload';
 import { Head, Link, useForm } from '@inertiajs/react';
+import { useState } from 'react';
+
+const FILE_MAX_MB = 10;
 
 function emptyLine() {
     return { item_id: '', qty: '' };
@@ -19,13 +23,15 @@ export default function Form({
     items,
 }) {
     const editing = Boolean(forecast);
-    const { data, setData, post, processing, errors, transform } = useForm({
+    const { data, setData, post, processing, errors, transform, setError, clearErrors } = useForm({
         supplier_rm_id: String(forecast?.supplier_rm_id || defaultSupplierId || ''),
         period_month: forecast?.period_month
             ? String(forecast.period_month).slice(0, 7)
             : defaultPeriod || '',
         notes: forecast?.notes || '',
-        file: null,
+        // File dikirim sebagai base64 (lihat utils/upload.js) agar tidak diblokir WAF.
+        file_base64: null,
+        file_name: null,
         items:
             forecast?.items?.length > 0
                 ? forecast.items.map((line) => ({
@@ -51,12 +57,38 @@ export default function Form({
         setData('items', next);
     };
 
+    const [fileEncoding, setFileEncoding] = useState(false);
+    const pickFile = async (file) => {
+        clearErrors('file');
+        if (!file) {
+            setData((prev) => ({ ...prev, file_base64: null, file_name: null }));
+            return;
+        }
+        if (file.size > FILE_MAX_MB * 1024 * 1024) {
+            setData((prev) => ({ ...prev, file_base64: null, file_name: null }));
+            setError(
+                'file',
+                `Ukuran file ${formatFileSize(file.size)} melebihi batas ${FILE_MAX_MB} MB.`,
+            );
+            return;
+        }
+        setFileEncoding(true);
+        try {
+            const encoded = await encodeUploadField('file', file);
+            setData((prev) => ({ ...prev, ...encoded }));
+        } catch (err) {
+            setError('file', err?.message || 'Gagal membaca file.');
+        } finally {
+            setFileEncoding(false);
+        }
+    };
+
     const submit = (e) => {
         e.preventDefault();
         if (editing) {
-            post(route('forecasts.update', forecast.id), { forceFormData: true });
+            post(route('forecasts.update', forecast.id));
         } else {
-            post(route('forecasts.store'), { forceFormData: true });
+            post(route('forecasts.store'));
         }
     };
 
@@ -124,9 +156,13 @@ export default function Form({
                                     type="file"
                                     className="mt-1 block w-full text-sm"
                                     accept=".pdf,.xlsx,.xls,.csv,.jpg,.jpeg,.png"
-                                    onChange={(e) => setData('file', e.target.files?.[0] || null)}
+                                    onChange={(e) => pickFile(e.target.files?.[0] || null)}
                                 />
-                                {forecast?.original_filename && !data.file && (
+                                <p className="mt-1 text-xs text-ink-muted">
+                                    PDF, Excel, CSV, JPG, atau PNG — maks. {FILE_MAX_MB} MB
+                                    {fileEncoding && ' · Membaca file…'}
+                                </p>
+                                {forecast?.original_filename && !data.file_base64 && (
                                     <p className="mt-1 text-xs text-ink-muted">
                                         File saat ini: {forecast.original_filename}
                                     </p>
@@ -228,8 +264,12 @@ export default function Form({
                         >
                             Batal
                         </Link>
-                        <PrimaryButton disabled={processing}>
-                            {editing ? 'Simpan Perubahan' : 'Upload Forecast'}
+                        <PrimaryButton disabled={processing || fileEncoding}>
+                            {processing
+                                ? 'Menyimpan…'
+                                : editing
+                                  ? 'Simpan Perubahan'
+                                  : 'Upload Forecast'}
                         </PrimaryButton>
                     </div>
                 </form>

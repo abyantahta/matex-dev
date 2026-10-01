@@ -5,8 +5,8 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Company;
 use App\Models\DeliveryNote;
-use App\Models\Item;
 use App\Models\PurchaseOrder;
+use App\Models\QadItem;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -20,11 +20,11 @@ class AdminDashboardController extends Controller
 
         $tables = [
             [
-                'key' => 'products',
-                'label' => 'Raw Material',
-                'description' => 'Master item RM & harga /kg — base data proses lain',
-                'route' => 'admin.items.index',
-                'count' => Item::count(),
+                'key' => 'qad-items',
+                'label' => 'Item Master QAD',
+                'description' => 'Master item hasil sync dari QAD — base data proses lain',
+                'route' => 'admin.qad-items.index',
+                'count' => QadItem::count(),
             ],
             [
                 'key' => 'suppliers',
@@ -38,7 +38,7 @@ class AdminDashboardController extends Controller
                 'label' => 'Kedisiplinan RM',
                 'description' => 'Raport keterlambatan kirim vs plan yang dikonfirmasi',
                 'route' => 'admin.discipline.index',
-                'count' => Company::query()->rawMat()->count(),
+                'count' => Company::query()->transactedAsRm()->count(),
             ],
         ];
 
@@ -53,7 +53,7 @@ class AdminDashboardController extends Controller
         }
 
         $stats = [
-            'items_rm' => Item::count(),
+            'items_qad' => QadItem::count(),
             'supplier_rm' => Company::query()->rawMat()->count(),
             'supplier_ohp' => Company::query()->ohp()->count(),
             'purchase_orders' => PurchaseOrder::count(),

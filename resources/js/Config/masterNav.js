@@ -17,14 +17,6 @@ export const MASTER_NAV_ITEMS = [
         roles: ['admin', 'purchasing'],
     },
     {
-        key: 'products',
-        route: 'admin.items.index',
-        label: 'Raw Material',
-        description: 'Item RM & harga /kg',
-        match: 'admin.items.*',
-        roles: ['admin', 'purchasing'],
-    },
-    {
         key: 'qad-items',
         route: 'admin.qad-items.index',
         label: 'Item Master QAD',

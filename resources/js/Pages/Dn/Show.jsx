@@ -5,8 +5,11 @@ import StatusBadge from '@/Components/StatusBadge';
 import TextInput from '@/Components/TextInput';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { formatQty } from '@/utils/qty';
+import { encodeUploadField, formatFileSize } from '@/utils/upload';
 import { Head, router, useForm, usePage } from '@inertiajs/react';
 import { useState } from 'react';
+
+const SJ_DOCUMENT_MAX_MB = 5;
 
 export default function Show({ note, sjUrl, receivingEnabled }) {
     const { auth, errors } = usePage().props;
@@ -18,10 +21,37 @@ export default function Show({ note, sjUrl, receivingEnabled }) {
     const [receiveQty, setReceiveQty] = useState(String(note.remaining_qty));
     const [receiveProcessing, setReceiveProcessing] = useState(false);
 
+    // Dokumen SJ dikirim sebagai base64 (lihat utils/upload.js) agar tidak diblokir WAF.
     const ohpForm = useForm({
-        sj_document: null,
+        sj_document_base64: null,
+        sj_document_name: null,
         notes: '',
     });
+    const [sjEncoding, setSjEncoding] = useState(false);
+    const pickSjDocument = async (file) => {
+        ohpForm.clearErrors('sj_document');
+        if (!file) {
+            ohpForm.setData((prev) => ({ ...prev, sj_document_base64: null, sj_document_name: null }));
+            return;
+        }
+        if (file.size > SJ_DOCUMENT_MAX_MB * 1024 * 1024) {
+            ohpForm.setData((prev) => ({ ...prev, sj_document_base64: null, sj_document_name: null }));
+            ohpForm.setError(
+                'sj_document',
+                `Ukuran file ${formatFileSize(file.size)} melebihi batas ${SJ_DOCUMENT_MAX_MB} MB.`,
+            );
+            return;
+        }
+        setSjEncoding(true);
+        try {
+            const encoded = await encodeUploadField('sj_document', file);
+            ohpForm.setData((prev) => ({ ...prev, ...encoded }));
+        } catch (err) {
+            ohpForm.setError('sj_document', err?.message || 'Gagal membaca file.');
+        } finally {
+            setSjEncoding(false);
+        }
+    };
 
     const dateForm = useForm({
         delivery_date: currentDeliveryDate,
@@ -203,7 +233,7 @@ export default function Show({ note, sjUrl, receivingEnabled }) {
                                 onSubmit={(e) => {
                                     e.preventDefault();
                                     ohpForm.post(route('delivery-notes.confirm-ohp', note.id), {
-                                        forceFormData: true,
+                                        preserveScroll: true,
                                     });
                                 }}
                             >
@@ -214,12 +244,12 @@ export default function Show({ note, sjUrl, receivingEnabled }) {
                                         accept=".jpg,.jpeg,.png,.pdf"
                                         className="mt-1 block w-full text-sm"
                                         onChange={(e) =>
-                                            ohpForm.setData(
-                                                'sj_document',
-                                                e.target.files?.[0] || null,
-                                            )
+                                            pickSjDocument(e.target.files?.[0] || null)
                                         }
                                     />
+                                    <p className="mt-1 text-xs text-ink-muted">
+                                        JPG, PNG, atau PDF — maks. {SJ_DOCUMENT_MAX_MB} MB
+                                    </p>
                                     <InputError
                                         message={ohpForm.errors.sj_document}
                                         className="mt-1"
@@ -235,10 +265,18 @@ export default function Show({ note, sjUrl, receivingEnabled }) {
                                     />
                                 </div>
                                 <PrimaryButton
-                                    disabled={ohpForm.processing}
+                                    disabled={
+                                        ohpForm.processing ||
+                                        sjEncoding ||
+                                        !ohpForm.data.sj_document_base64
+                                    }
                                     className="bg-blue-700 hover:bg-blue-800"
                                 >
-                                    Submit Konfirmasi OHP
+                                    {sjEncoding
+                                        ? 'Membaca file…'
+                                        : ohpForm.processing
+                                          ? `Mengunggah… ${ohpForm.progress?.percentage ?? 0}%`
+                                          : 'Submit Konfirmasi OHP'}
                                 </PrimaryButton>
                             </form>
                         </section>

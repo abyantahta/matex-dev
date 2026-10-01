@@ -49,7 +49,7 @@ class SupplierDisciplineController extends Controller
                 'supplier_id' => $supplierId,
             ],
             'supplierOptions' => Company::query()
-                ->rawMat()
+                ->transactedAsRm()
                 ->orderBy('name')
                 ->get(['id', 'code', 'name']),
         ]);

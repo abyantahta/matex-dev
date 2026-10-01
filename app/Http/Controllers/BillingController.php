@@ -19,7 +19,10 @@ class BillingController extends Controller
             403
         );
 
+        // Hanya receiving yang sukses terposting di QAD yang masuk billing —
+        // percobaan yang ditolak QAD bukan penerimaan barang.
         $baseQuery = Receiving::query()
+            ->posted()
             ->when(
                 $user->hasRole(UserRole::SupplierRm),
                 fn ($q) => $q->whereHas(

@@ -13,6 +13,19 @@ export default function Index({ ready, history, receivingEnabled }) {
     const [partialOpenId, setPartialOpenId] = useState(null);
     const [qtyByNote, setQtyByNote] = useState({});
     const [processingId, setProcessingId] = useState(null);
+    const [retryingId, setRetryingId] = useState(null);
+
+    const retryQad = (receiving) => {
+        setRetryingId(receiving.id);
+        router.post(
+            route('receivings.retry-qad', receiving.id),
+            {},
+            {
+                preserveScroll: true,
+                onFinish: () => setRetryingId(null),
+            },
+        );
+    };
 
     const submitReceive = (note, qty) => {
         setProcessingId(note.id);
@@ -85,6 +98,18 @@ export default function Index({ ready, history, receivingEnabled }) {
                                                         Sudah diterima {formatQty(note.received_qty)} kg
                                                         — sisa {formatQty(note.remaining_qty)} kg
                                                     </p>
+                                                )}
+                                                {note.qad_error_message && (
+                                                    <div className="mt-2 max-w-xl rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-xs leading-snug text-rose-800">
+                                                        <span className="font-semibold">
+                                                            Percobaan receiving terakhir ditolak QAD
+                                                            {note.last_failed_receiving?.received_at
+                                                                ? ` (${new Date(note.last_failed_receiving.received_at).toLocaleString('id-ID')})`
+                                                                : ''}
+                                                            .
+                                                        </span>{' '}
+                                                        {note.qad_error_message}
+                                                    </div>
                                                 )}
                                             </div>
 
@@ -205,8 +230,27 @@ export default function Index({ ready, history, receivingEnabled }) {
                                                 }
                                             </td>
                                             <td className="px-4 py-3">{formatQty(r.received_qty)}</td>
-                                            <td className="px-4 py-3">
-                                                <StatusBadge type="qad" value={r.qad_status} />
+                                            <td className="max-w-md px-4 py-3">
+                                                <div className="flex flex-wrap items-center gap-2">
+                                                    <StatusBadge type="qad" value={r.qad_status} />
+                                                    {r.qad_status === 'failed' && receivingEnabled && (
+                                                        <button
+                                                            type="button"
+                                                            disabled={retryingId === r.id}
+                                                            onClick={() => retryQad(r)}
+                                                            className="rounded-md border border-rose-300 bg-rose-50 px-2.5 py-1 text-xs font-semibold text-rose-800 hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-50"
+                                                        >
+                                                            {retryingId === r.id
+                                                                ? 'Mengirim…'
+                                                                : 'Coba lagi'}
+                                                        </button>
+                                                    )}
+                                                </div>
+                                                {r.qad_error_message && (
+                                                    <p className="mt-1.5 text-xs leading-snug text-rose-700">
+                                                        {r.qad_error_message}
+                                                    </p>
+                                                )}
                                             </td>
                                             <td className="px-4 py-3">{r.receiver?.name}</td>
                                         </tr>

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Actions\Receiving\ReceiveToQad;
+use App\Enums\QadSyncStatus;
 use App\Enums\ScheduleStatus;
 use App\Http\Requests\ReceiveRequest;
 use App\Models\DeliveryNote;
@@ -26,11 +27,12 @@ class ReceivingController extends Controller
                 'deliverySchedule.ohpSupplier',
                 'ohpConfirmation',
                 'receivings',
+                'lastFailedReceiving',
             ])
             ->whereHas('deliverySchedule', fn ($q) => $q->where('status', ScheduleStatus::OhpOk))
             ->latest()
             ->get()
-            ->each->append(['received_qty', 'remaining_qty', 'is_fully_received']);
+            ->each->append(['received_qty', 'remaining_qty', 'is_fully_received', 'qad_error_message']);
 
         $history = Receiving::query()
             ->with([
@@ -39,7 +41,8 @@ class ReceivingController extends Controller
                 'receiver',
             ])
             ->latest()
-            ->paginate(15);
+            ->paginate(15)
+            ->through(fn (Receiving $r) => tap($r)->append('qad_error_message'));
 
         return Inertia::render('Receiving/Index', [
             'ready' => $ready,
@@ -60,13 +63,29 @@ class ReceivingController extends Controller
             $request->validated('notes')
         );
 
-        $message = $deliveryNote->fresh()->is_fully_received
-            ? 'Receiving selesai (lunas) dan telah di-push ke QAD.'
-            : 'Receiving parsial dicatat dan telah di-push ke QAD.';
+        return $this->respond($receiving, $deliveryNote);
+    }
 
-        if ($receiving->qad_status?->value === 'failed') {
-            $message = 'Receiving tercatat, tapi push ke QAD gagal — cek detail.';
+    public function retry(Receiving $receiving, ReceiveToQad $action): RedirectResponse
+    {
+        $receiving = $action->retry($receiving, request()->user());
+
+        return $this->respond($receiving, $receiving->deliveryNote);
+    }
+
+    private function respond(Receiving $receiving, DeliveryNote $deliveryNote): RedirectResponse
+    {
+        if ($receiving->qad_status === QadSyncStatus::Failed) {
+            return back()->with(
+                'error',
+                "Receiving DN {$deliveryNote->dn_number} ({$receiving->received_qty} kg) DITOLAK QAD — barang belum tercatat diterima, silakan coba lagi nanti. "
+                    .$receiving->qad_error_message
+            );
         }
+
+        $message = $deliveryNote->fresh()->is_fully_received
+            ? "Receiving DN {$deliveryNote->dn_number} selesai (lunas) dan terposting di QAD."
+            : "Receiving parsial DN {$deliveryNote->dn_number} ({$receiving->received_qty} kg) terposting di QAD.";
 
         return back()->with('success', $message);
     }

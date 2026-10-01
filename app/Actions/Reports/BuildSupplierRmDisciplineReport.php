@@ -46,7 +46,7 @@ class BuildSupplierRmDisciplineReport
         $bySupplier = $this->aggregateBySupplier($shipments, $overdue);
 
         $suppliers = Company::query()
-            ->rawMat()
+            ->transactedAsRm()
             ->orderBy('name')
             ->get(['id', 'code', 'name', 'is_active'])
             ->map(function (Company $company) use ($bySupplier) {

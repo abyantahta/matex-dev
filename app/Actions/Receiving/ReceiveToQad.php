@@ -23,11 +23,24 @@ class ReceiveToQad
      * Records one receipt against a DN — can be partial (goods arriving in
      * installments across several trucks/dates). Each call pushes only the
      * qty received THIS time to QAD (receivePurchaseOrder reduces QAD's own
-     * open qty incrementally), and the schedule only flips to Received once
-     * the DN's cumulative received qty reaches its full qty.
+     * open qty incrementally).
+     *
+     * Receiving dianggap SAH hanya jika QAD menerima posting-nya. Kalau QAD
+     * menolak (mis. periode GL belum dibuka), baris Receiving tetap disimpan
+     * berstatus Failed sebagai jejak + pesan error, tapi TIDAK dihitung
+     * sebagai qty diterima: sisa DN tidak berkurang, status jadwal/PO tidak
+     * berubah, dan DN tetap muncul di antrian "Siap Receive" untuk dicoba lagi.
+     *
+     * $retryOf: baris Failed sebelumnya yang dipakai ulang (bukan insert
+     * baru) supaya history tidak penuh dengan percobaan gagal yang sama.
      */
-    public function execute(DeliveryNote $dn, User $user, ?float $receivedQty = null, ?string $notes = null): Receiving
-    {
+    public function execute(
+        DeliveryNote $dn,
+        User $user,
+        ?float $receivedQty = null,
+        ?string $notes = null,
+        ?Receiving $retryOf = null,
+    ): Receiving {
         // Same kill switch as DeliveryNotePolicy::receive() — checked here
         // too since this action could be invoked directly (tinker, a future
         // feature) bypassing the policy.
@@ -45,7 +58,7 @@ class ReceiveToQad
             ]);
         }
 
-        $alreadyReceived = (int) $dn->receivings()->sum('received_qty');
+        $alreadyReceived = (int) $dn->receivings()->posted()->sum('received_qty');
         $remaining = (int) $dn->qty - $alreadyReceived;
 
         if ($remaining <= 0) {
@@ -56,22 +69,33 @@ class ReceiveToQad
 
         $qty = $receivedQty !== null ? (float) $receivedQty : (float) $remaining;
 
+        if ($qty <= 0) {
+            throw ValidationException::withMessages([
+                'received_qty' => 'Qty receiving harus lebih dari 0.',
+            ]);
+        }
+
         if ($qty > $remaining) {
             throw ValidationException::withMessages([
                 'received_qty' => "Qty melebihi sisa yang belum diterima ({$remaining} kg).",
             ]);
         }
 
-        return DB::transaction(function () use ($dn, $schedule, $user, $qty, $notes, $alreadyReceived) {
-            $receiving = Receiving::create([
-                'delivery_note_id' => $dn->id,
+        return DB::transaction(function () use ($dn, $schedule, $user, $qty, $notes, $alreadyReceived, $retryOf) {
+            // Pakai ulang percobaan gagal terakhir untuk DN ini (kalau ada)
+            // agar satu DN tidak menumpuk banyak baris "Gagal" di history.
+            $receiving = $retryOf
+                ?? $dn->receivings()->where('qad_status', QadSyncStatus::Failed)->latest()->first()
+                ?? new Receiving(['delivery_note_id' => $dn->id]);
+
+            $receiving->fill([
                 'delivery_schedule_id' => $schedule->id,
                 'received_qty' => $qty,
                 'received_by' => $user->id,
                 'received_at' => now(),
                 'qad_status' => QadSyncStatus::Pending,
-                'notes' => $notes,
-            ]);
+                'notes' => $notes ?? $receiving->notes,
+            ])->save();
 
             $result = $this->qad->receive($receiving);
 
@@ -81,13 +105,29 @@ class ReceiveToQad
                 'qad_response' => $result['response'],
             ]);
 
+            $po = $dn->purchaseOrder;
+
+            if (! $result['success']) {
+                // Jejak di timeline PO, status tidak berubah.
+                $this->logStatus(
+                    $po,
+                    $po->status,
+                    $po->status,
+                    'receiving_failed',
+                    $user,
+                    "Receiving DN {$dn->dn_number} ({$qty} kg) ditolak QAD — ".$receiving->fresh()->qad_error_message
+                );
+
+                return $receiving->fresh(['deliveryNote', 'receiver']);
+            }
+
             $isFullyReceived = ($alreadyReceived + $qty) >= (int) $dn->qty;
 
             if ($isFullyReceived) {
                 $schedule->update(['status' => ScheduleStatus::Received]);
             }
 
-            $po = $dn->purchaseOrder->fresh(['schedules']);
+            $po = $po->fresh(['schedules']);
             $allReceived = $isFullyReceived && $po->schedules->every(
                 fn ($s) => $s->status === ScheduleStatus::Received
             );
@@ -120,5 +160,27 @@ class ReceiveToQad
 
             return $receiving->fresh(['deliveryNote', 'receiver']);
         });
+    }
+
+    /**
+     * Mengulang receiving yang ditolak QAD dengan qty yang sama — alur
+     * penuhnya sama persis dengan execute(), termasuk update status jadwal/PO
+     * bila kali ini QAD menerima.
+     */
+    public function retry(Receiving $receiving, User $user): Receiving
+    {
+        if ($receiving->qad_status !== QadSyncStatus::Failed) {
+            throw ValidationException::withMessages([
+                'status' => 'Hanya receiving yang ditolak QAD yang bisa dikirim ulang.',
+            ]);
+        }
+
+        return $this->execute(
+            $receiving->deliveryNote,
+            $user,
+            (float) $receiving->received_qty,
+            $receiving->notes,
+            $receiving,
+        );
     }
 }

@@ -189,7 +189,7 @@ class PurchaseOrderController extends Controller
     /**
      * Local, matex-only enrichment (price, default subcont OHP) keyed by
      * item_number — items are auto-provisioned from the QAD item master the
-     * first time they're used on a PO, then editable via Admin > Raw Material.
+     * first time they're used on a PO.
      * subcont_ohp_code (not id) since the PO form's OHP picker is now
      * QAD-code-keyed too.
      */

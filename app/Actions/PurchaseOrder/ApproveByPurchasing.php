@@ -31,6 +31,15 @@ class ApproveByPurchasing
         }
 
         $po = DB::transaction(function () use ($po, $user) {
+            // Tanggal rencana yang dikosongkan RM (qty_confirmed 0) hanya
+            // dipertahankan untuk review Purchasing. Setelah OK, buang agar
+            // tidak muncul sebagai jadwal/DN yang harus dikirim.
+            $po->schedules()
+                ->whereNull('ship_confirmed_at')
+                ->whereDoesntHave('deliveryNote')
+                ->where('qty_confirmed', 0)
+                ->delete();
+
             $from = $po->status;
             $po->update([
                 'status' => PoStatus::Confirmed,

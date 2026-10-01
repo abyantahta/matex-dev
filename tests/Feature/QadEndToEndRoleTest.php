@@ -196,8 +196,11 @@ class QadEndToEndRoleTest extends TestCase
         $schedule = $po->schedules->first();
         $this->actingAs($this->rm())
             ->post(route('purchase-orders.confirm-rm', $po), [
-                'items' => [['id' => $poItem->id, 'qty_confirmed' => 30]],
-                'schedules' => [['id' => $schedule->id, 'qty_confirmed' => 30]],
+                'schedules' => [[
+                    'purchase_order_item_id' => $poItem->id,
+                    'scheduled_date' => $schedule->scheduled_date->toDateString(),
+                    'qty_confirmed' => 30,
+                ]],
             ])
             ->assertRedirect();
         $po->refresh();
@@ -290,8 +293,11 @@ class QadEndToEndRoleTest extends TestCase
         $poItem = $po->items->first();
         $schedule = $po->schedules->first();
         $payload = [
-            'items' => [['id' => $poItem->id, 'qty_confirmed' => 30]],
-            'schedules' => [['id' => $schedule->id, 'qty_confirmed' => 30]],
+            'schedules' => [[
+                'purchase_order_item_id' => $poItem->id,
+                'scheduled_date' => $schedule->scheduled_date->toDateString(),
+                'qty_confirmed' => 30,
+            ]],
         ];
 
         foreach ([$this->rmWrong(), $this->rmOther(), $this->ohp(), $this->ppic(), $this->purchasing()] as $user) {
@@ -302,29 +308,61 @@ class QadEndToEndRoleTest extends TestCase
         $this->assertSame(PoStatus::AwaitingPurchasingOk, $po->fresh()->status);
     }
 
-    public function test_supplier_rm_can_move_schedule_date_within_due_month_but_not_outside_it(): void
+    public function test_supplier_rm_can_mix_and_match_dates_within_due_month_but_not_outside_it(): void
     {
         // due_date is 2026-12-20 in makeFixturePo, so the confirm matrix's
-        // valid range is the whole of December 2026.
+        // valid range is the whole of December 2026. Purchasing's plan is
+        // 30 kg on 2026-12-05; RM may split/move it to any dates in-month.
         $po = $this->makeFixturePo(PoStatus::AwaitingRmConfirm);
         $poItem = $po->items->first();
         $schedule = $po->schedules->first();
 
         $this->actingAs($this->rm())
             ->post(route('purchase-orders.confirm-rm', $po), [
-                'items' => [['id' => $poItem->id, 'qty_confirmed' => 30]],
-                'schedules' => [['id' => $schedule->id, 'qty_confirmed' => 30, 'scheduled_date' => '2027-01-05']],
+                'schedules' => [[
+                    'purchase_order_item_id' => $poItem->id,
+                    'scheduled_date' => '2027-01-05',
+                    'qty_confirmed' => 30,
+                ]],
             ])
             ->assertSessionHasErrors('schedules.0.scheduled_date');
         $this->assertSame('2026-12-05', $schedule->fresh()->scheduled_date->format('Y-m-d'));
 
+        // Every part must end up with some qty somewhere.
         $this->actingAs($this->rm())
             ->post(route('purchase-orders.confirm-rm', $po), [
-                'items' => [['id' => $poItem->id, 'qty_confirmed' => 30]],
-                'schedules' => [['id' => $schedule->id, 'qty_confirmed' => 30, 'scheduled_date' => '2026-12-18']],
+                'schedules' => [[
+                    'purchase_order_item_id' => $poItem->id,
+                    'scheduled_date' => '2026-12-05',
+                    'qty_confirmed' => 0,
+                ]],
+            ])
+            ->assertSessionHasErrors('schedules');
+
+        // Drop the planned date, split across two new dates.
+        $this->actingAs($this->rm())
+            ->post(route('purchase-orders.confirm-rm', $po), [
+                'schedules' => [
+                    ['purchase_order_item_id' => $poItem->id, 'scheduled_date' => '2026-12-05', 'qty_confirmed' => 0],
+                    ['purchase_order_item_id' => $poItem->id, 'scheduled_date' => '2026-12-10', 'qty_confirmed' => 20],
+                    ['purchase_order_item_id' => $poItem->id, 'scheduled_date' => '2026-12-18', 'qty_confirmed' => 15],
+                ],
             ])
             ->assertRedirect();
-        $this->assertSame('2026-12-18', $schedule->fresh()->scheduled_date->format('Y-m-d'));
+
+        $po->refresh();
+        $this->assertSame(35, $poItem->fresh()->qty_confirmed);
+        // Planned row kept (qty_confirmed 0) for Purchasing's review; two RM-added rows with plan 0.
+        $this->assertSame(0, $schedule->fresh()->qty_confirmed);
+        $byDate = $po->schedules->keyBy(fn ($s) => $s->scheduled_date->toDateString());
+        $this->assertSame(20, $byDate['2026-12-10']->qty_confirmed);
+        $this->assertSame(0, $byDate['2026-12-10']->qty);
+        $this->assertSame(15, $byDate['2026-12-18']->qty_confirmed);
+
+        // Purchasing approval drops the emptied planned date.
+        $this->actingAs($this->purchasing())->post(route('purchase-orders.approve', $po))->assertRedirect();
+        $this->assertNull($schedule->fresh());
+        $this->assertCount(2, $po->fresh()->schedules);
     }
 
     public function test_only_purchasing_and_admin_can_approve_or_reject_po(): void

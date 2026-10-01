@@ -138,7 +138,10 @@ export default function Index({
 
                     {!suppliers.length ? (
                         <div className="mt-4">
-                            <EmptyState title="Belum ada supplier RM" />
+                            <EmptyState
+                                title="Belum ada supplier RM yang bertransaksi"
+                                description="Supplier muncul di sini setelah ada PO yang dikonfirmasi oleh Supplier RM."
+                            />
                         </div>
                     ) : (
                         <div className="mt-4 overflow-hidden ui-panel">
