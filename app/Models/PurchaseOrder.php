@@ -28,6 +28,10 @@ class PurchaseOrder extends Model
         'qad_po_number',
         'qad_payload',
         'qad_response',
+        'signed_po_path',
+        'signed_po_original_filename',
+        'signed_po_uploaded_at',
+        'signed_po_uploaded_by',
     ];
 
     protected function casts(): array
@@ -41,6 +45,7 @@ class PurchaseOrder extends Model
             'qad_status' => QadSyncStatus::class,
             'qad_payload' => 'array',
             'qad_response' => 'array',
+            'signed_po_uploaded_at' => 'datetime',
         ];
     }
 
@@ -52,6 +57,16 @@ class PurchaseOrder extends Model
     public function creator(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by');
+    }
+
+    public function signedPoUploader(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'signed_po_uploaded_by');
+    }
+
+    public function getHasSignedPoAttribute(): bool
+    {
+        return filled($this->signed_po_path);
     }
 
     public function items(): HasMany

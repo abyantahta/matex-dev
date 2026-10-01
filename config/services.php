@@ -35,4 +35,11 @@ return [
         ],
     ],
 
+    // Fonnte WhatsApp gateway (https://fonnte.com) — token comes from a
+    // connected device in the Fonnte dashboard, not a Meta Business API key.
+    'fonnte' => [
+        'token' => env('FONNTE_TOKEN'),
+        'url' => env('FONNTE_URL', 'https://api.fonnte.com/send'),
+    ],
+
 ];

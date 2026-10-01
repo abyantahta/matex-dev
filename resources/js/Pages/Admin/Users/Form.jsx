@@ -16,6 +16,7 @@ export default function Form({ user, prefill, qadSuppliers, roles }) {
     const { data, setData, post, put, processing, errors } = useForm({
         name: user?.name || '',
         email: user?.email || '',
+        phone: user?.phone || '',
         password: '',
         password_confirmation: '',
         role: user?.role || prefill?.role || roles[0]?.value || 'purchasing',
@@ -67,6 +68,33 @@ export default function Form({ user, prefill, qadSuppliers, roles }) {
                         />
                         <InputError message={errors.email} className="mt-1" />
                     </div>
+                </div>
+
+                <div className="grid gap-4 sm:grid-cols-2">
+                    <div>
+                        <InputLabel
+                            value={
+                                data.role === 'supplier_rm'
+                                    ? 'No. WhatsApp (wajib untuk Supplier RM)'
+                                    : 'No. WhatsApp'
+                            }
+                        />
+                        <TextInput
+                            type="tel"
+                            className="mt-1 w-full"
+                            placeholder="Contoh: 081234567890"
+                            value={data.phone}
+                            onChange={(e) => setData('phone', e.target.value)}
+                        />
+                        <InputError message={errors.phone} className="mt-1" />
+                        {data.role === 'supplier_rm' && (
+                            <p className="mt-1 text-xs text-ink-muted">
+                                Dipakai untuk kirim notifikasi WhatsApp saat PO
+                                dikirim/dikonfirmasi.
+                            </p>
+                        )}
+                    </div>
+                    <div />
                 </div>
 
                 <div className="grid gap-4 sm:grid-cols-2">

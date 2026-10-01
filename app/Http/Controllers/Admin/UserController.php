@@ -11,6 +11,7 @@ use App\Http\Requests\Admin\UpdateUserRequest;
 use App\Models\Company;
 use App\Models\QadSupplier;
 use App\Models\User;
+use Illuminate\Database\QueryException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -74,6 +75,7 @@ class UserController extends Controller
         User::create([
             'name' => $data['name'],
             'email' => $data['email'],
+            'phone' => $data['phone'] ?? null,
             'password' => $data['password'],
             'role' => $data['role'],
             'company_id' => $this->resolveCompanyId($data['role'], $data['supplier_code'] ?? null),
@@ -104,6 +106,7 @@ class UserController extends Controller
         $payload = [
             'name' => $data['name'],
             'email' => $data['email'],
+            'phone' => $data['phone'] ?? null,
             'role' => $data['role'],
             'company_id' => $this->resolveCompanyId($data['role'], $data['supplier_code'] ?? null),
         ];
@@ -131,7 +134,15 @@ class UserController extends Controller
             return back()->with('error', 'Tidak dapat menghapus admin terakhir.');
         }
 
-        $user->delete();
+        try {
+            $user->delete();
+        } catch (QueryException $e) {
+            if ((string) $e->getCode() === '23000') {
+                return back()->with('error', 'User ini masih memiliki riwayat transaksi (mis. konfirmasi OHP, receiving, dsb) dan tidak dapat dihapus.');
+            }
+
+            throw $e;
+        }
 
         return back()->with('success', 'User berhasil dihapus.');
     }

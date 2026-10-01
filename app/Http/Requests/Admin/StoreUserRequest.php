@@ -34,6 +34,13 @@ class StoreUserRequest extends FormRequest
         return [
             'name' => ['required', 'string', 'max:150'],
             'email' => ['required', 'email', 'max:255', 'unique:users,email'],
+            // Required for Supplier RM — this is the WhatsApp notification
+            // number for PO submit/confirm alerts (see PurchaseOrder
+            // submit/approve notifications). Optional for other roles.
+            'phone' => [
+                Rule::requiredIf(fn () => $this->input('role') === UserRole::SupplierRm->value),
+                'nullable', 'string', 'max:30',
+            ],
             'password' => ['required', 'confirmed', Password::defaults()],
             'role' => ['required', Rule::in($allowedRoles)],
             'supplier_code' => ['nullable', 'string'],

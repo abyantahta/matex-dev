@@ -17,6 +17,7 @@ class User extends Authenticatable
     protected $fillable = [
         'name',
         'email',
+        'phone',
         'password',
         'role',
         'company_id',
@@ -54,5 +55,11 @@ class User extends Authenticatable
     public function isSdiStaff(): bool
     {
         return $this->hasRole(UserRole::Admin, UserRole::Purchasing, UserRole::Ppic);
+    }
+
+    /** Laravel notification routing convention for the WhatsAppChannel. */
+    public function routeNotificationForWhatsApp(): ?string
+    {
+        return $this->phone;
     }
 }

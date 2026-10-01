@@ -462,6 +462,21 @@ export default function Show({ order, hideInternalHistory = false }) {
     const showRmChanges = ['awaiting_purchasing_ok', 'confirmed', 'in_progress', 'completed'].includes(
         order.status,
     );
+    const signedPoRelevant = ['confirmed', 'in_progress', 'completed'].includes(order.status);
+    const canUploadSignedPo = canEdit && signedPoRelevant;
+
+    const signedPoForm = useForm({ signed_po: null });
+    const submitSignedPo = (e) => {
+        e.preventDefault();
+        if (!signedPoForm.data.signed_po) {
+            return;
+        }
+        signedPoForm.post(route('purchase-orders.upload-signed-po', order.id), {
+            forceFormData: true,
+            preserveScroll: true,
+            onSuccess: () => signedPoForm.reset('signed_po'),
+        });
+    };
 
     const dueMonth = parseDueMonth(order.due_date);
     const matrixMode = canConfirmRm ? 'edit' : showRmChanges || canApprove ? 'review' : 'view';
@@ -586,6 +601,79 @@ export default function Show({ order, hideInternalHistory = false }) {
                             {!hideInternalHistory && order.rejection_reason && (
                                 <div className="mt-4 rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800">
                                     Alasan reject: {order.rejection_reason}
+                                </div>
+                            )}
+
+                            {!hideInternalHistory && signedPoRelevant && (
+                                <div
+                                    className={`mt-4 rounded-lg border p-3 text-sm ${
+                                        order.has_signed_po
+                                            ? 'border-brand-line bg-brand-muted text-brand-deep'
+                                            : 'border-amber-200 bg-amber-50 text-amber-900'
+                                    }`}
+                                >
+                                    <div className="flex flex-wrap items-center justify-between gap-2">
+                                        <div>
+                                            <p className="font-semibold">
+                                                {order.has_signed_po
+                                                    ? 'Signed PO sudah diunggah'
+                                                    : 'Signed PO (BOD) belum diunggah'}
+                                            </p>
+                                            {order.has_signed_po && (
+                                                <p className="mt-0.5 text-xs opacity-80">
+                                                    {new Date(
+                                                        order.signed_po_uploaded_at,
+                                                    ).toLocaleString('id-ID')}{' '}
+                                                    oleh {order.signed_po_uploader?.name || '—'}
+                                                </p>
+                                            )}
+                                        </div>
+                                        {order.has_signed_po && (
+                                            <a
+                                                href={route(
+                                                    'purchase-orders.download-signed-po',
+                                                    order.id,
+                                                )}
+                                                className="rounded-md border border-brand-line bg-surface px-3 py-1.5 text-xs font-semibold text-brand hover:bg-brand-muted"
+                                            >
+                                                Unduh Signed PO
+                                            </a>
+                                        )}
+                                    </div>
+
+                                    {canUploadSignedPo && (
+                                        <form
+                                            onSubmit={submitSignedPo}
+                                            className="mt-3 flex flex-wrap items-center gap-2"
+                                        >
+                                            <input
+                                                type="file"
+                                                accept="application/pdf"
+                                                className="text-xs"
+                                                onChange={(e) =>
+                                                    signedPoForm.setData(
+                                                        'signed_po',
+                                                        e.target.files?.[0] || null,
+                                                    )
+                                                }
+                                            />
+                                            <PrimaryButton
+                                                className="bg-brand py-1.5 text-xs"
+                                                disabled={
+                                                    signedPoForm.processing ||
+                                                    !signedPoForm.data.signed_po
+                                                }
+                                            >
+                                                {order.has_signed_po
+                                                    ? 'Ganti File'
+                                                    : 'Unggah Signed PO'}
+                                            </PrimaryButton>
+                                            <InputError
+                                                message={signedPoForm.errors.signed_po}
+                                                className="w-full text-xs"
+                                            />
+                                        </form>
+                                    )}
                                 </div>
                             )}
                         </section>

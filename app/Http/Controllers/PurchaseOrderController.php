@@ -8,6 +8,7 @@ use App\Actions\PurchaseOrder\RejectByPurchasing;
 use App\Actions\PurchaseOrder\StorePurchaseOrder;
 use App\Actions\PurchaseOrder\SubmitPurchaseOrder;
 use App\Actions\PurchaseOrder\UpdatePurchaseOrder;
+use App\Actions\PurchaseOrder\UploadSignedPo;
 use App\Enums\CompanyType;
 use App\Enums\ScheduleStatus;
 use App\Enums\UserRole;
@@ -15,14 +16,17 @@ use App\Http\Requests\ConfirmByRmRequest;
 use App\Http\Requests\RejectPurchaseOrderRequest;
 use App\Http\Requests\StorePurchaseOrderRequest;
 use App\Http\Requests\UpdatePurchaseOrderRequest;
+use App\Http\Requests\UploadSignedPoRequest;
 use App\Models\Item;
 use App\Models\PurchaseOrder;
 use App\Models\QadItem;
 use App\Models\QadSupplier;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 use Inertia\Response;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class PurchaseOrderController extends Controller
 {
@@ -41,7 +45,7 @@ class PurchaseOrderController extends Controller
             ->latest()
             ->paginate(15)
             ->withQueryString()
-            ->through(fn (PurchaseOrder $po) => tap($po)->append('is_closed'));
+            ->through(fn (PurchaseOrder $po) => tap($po)->append(['is_closed', 'has_signed_po']));
 
         return Inertia::render('Po/Index', [
             'orders' => $orders,
@@ -104,6 +108,7 @@ class PurchaseOrderController extends Controller
             'deliveryNotes.purchaseOrderItem.item',
             'deliveryNotes.deliverySchedule.ohpSupplier',
             'statusLogs.user',
+            'signedPoUploader',
         ]);
 
         $purchaseOrder->loadCount([
@@ -113,7 +118,7 @@ class PurchaseOrderController extends Controller
                 ScheduleStatus::sentAndApprovedValues()
             ),
         ]);
-        $purchaseOrder->append('is_closed');
+        $purchaseOrder->append(['is_closed', 'has_signed_po']);
         $purchaseOrder->restrictRelationsFor($user);
 
         // OHP tidak melihat history internal SDI ↔ Supplier RM
@@ -252,5 +257,30 @@ class PurchaseOrderController extends Controller
         $action->execute($purchaseOrder, $request->user(), $request->validated('reason'));
 
         return back()->with('success', 'Konfirmasi ditolak. Supplier RM perlu submit ulang.');
+    }
+
+    public function uploadSignedPo(
+        UploadSignedPoRequest $request,
+        PurchaseOrder $purchaseOrder,
+        UploadSignedPo $action,
+    ): RedirectResponse {
+        $action->execute($purchaseOrder, $request->user(), $request->file('signed_po'));
+
+        return back()->with('success', 'Signed PO berhasil diunggah.');
+    }
+
+    public function downloadSignedPo(PurchaseOrder $purchaseOrder): StreamedResponse
+    {
+        $this->authorize('viewSignedPo', $purchaseOrder);
+
+        abort_unless(
+            $purchaseOrder->signed_po_path && Storage::disk('public')->exists($purchaseOrder->signed_po_path),
+            404
+        );
+
+        return Storage::disk('public')->download(
+            $purchaseOrder->signed_po_path,
+            $purchaseOrder->signed_po_original_filename ?: "Signed-PO-{$purchaseOrder->po_number}.pdf"
+        );
     }
 }

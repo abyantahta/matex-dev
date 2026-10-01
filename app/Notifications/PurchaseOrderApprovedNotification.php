@@ -3,6 +3,7 @@
 namespace App\Notifications;
 
 use App\Models\PurchaseOrder;
+use App\Notifications\Channels\WhatsAppChannel;
 use Illuminate\Bus\Queueable;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
@@ -22,7 +23,24 @@ class PurchaseOrderApprovedNotification extends Notification
 
     public function via(object $notifiable): array
     {
-        return ['mail'];
+        return ['mail', WhatsAppChannel::class];
+    }
+
+    public function toWhatsApp(object $notifiable): string
+    {
+        $po = $this->po;
+        $lines = $po->items->map(function ($poItem) {
+            $qty = $poItem->qty_confirmed ?? $poItem->qty_ordered;
+
+            return "- {$poItem->item->item_number} ({$poItem->item->description}): {$qty} {$poItem->item->uom}";
+        })->implode("\n");
+
+        return "Halo {$notifiable->name},\n\n"
+            ."PO *{$po->po_number}* telah dikonfirmasi OK oleh Purchasing PT. Sankei Dharma Indonesia.\n\n"
+            ."{$lines}\n\n"
+            .'Due date: '.$po->due_date->format('d M Y')."\n\n"
+            ."Mohon segera isi nomor Surat Jalan internal dan generate Delivery Note lewat portal Matex:\n"
+            .route('purchase-orders.show', $po);
     }
 
     public function toMail(object $notifiable): MailMessage

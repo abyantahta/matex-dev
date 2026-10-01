@@ -78,6 +78,7 @@ export default function Index({ users, filters, roles }) {
                             <tr>
                                 <th className="px-4 py-3">Name</th>
                                 <th className="px-4 py-3">Email</th>
+                                <th className="px-4 py-3">No. WhatsApp</th>
                                 <th className="px-4 py-3">Role</th>
                                 <th className="px-4 py-3">Company</th>
                                 <th className="px-4 py-3"></th>
@@ -88,6 +89,17 @@ export default function Index({ users, filters, roles }) {
                                 <tr key={user.id} className="hover:bg-canvas-soft">
                                     <td className="px-4 py-3 font-medium">{user.name}</td>
                                     <td className="px-4 py-3">{user.email}</td>
+                                    <td className="px-4 py-3">
+                                        {user.phone || (
+                                            user.role === 'supplier_rm' ? (
+                                                <span className="text-rose-600">
+                                                    Belum diisi
+                                                </span>
+                                            ) : (
+                                                '—'
+                                            )
+                                        )}
+                                    </td>
                                     <td className="px-4 py-3">
                                         {roleLabel[user.role] || user.role}
                                     </td>

@@ -3,14 +3,17 @@
 namespace App\Actions\PurchaseOrder;
 
 use App\Actions\Concerns\LogsPoStatus;
+use App\Actions\Concerns\NotifiesSupplierRm;
 use App\Enums\PoStatus;
 use App\Models\PurchaseOrder;
 use App\Models\User;
+use App\Notifications\PurchaseOrderSubmittedNotification;
 use Illuminate\Validation\ValidationException;
 
 class SubmitPurchaseOrder
 {
     use LogsPoStatus;
+    use NotifiesSupplierRm;
 
     public function execute(PurchaseOrder $po, User $user): PurchaseOrder
     {
@@ -35,6 +38,10 @@ class SubmitPurchaseOrder
 
         $this->logStatus($po, $from, PoStatus::AwaitingRmConfirm, 'submitted', $user);
 
-        return $po->fresh();
+        $po = $po->fresh(['items.item']);
+
+        $this->notifySupplierRm($po, new PurchaseOrderSubmittedNotification($po));
+
+        return $po;
     }
 }

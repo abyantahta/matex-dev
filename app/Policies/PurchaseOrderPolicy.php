@@ -69,4 +69,35 @@ class PurchaseOrderPolicy
     {
         return $this->approveAsPurchasing($user, $purchaseOrder);
     }
+
+    /**
+     * Signed PO (BOD-signed scan) can be uploaded — or replaced — any time
+     * once the PO is confirmed, no deadline. Not available before Confirmed
+     * since there's nothing synced to QAD yet to attach a signed copy to.
+     */
+    public function uploadSignedPo(User $user, PurchaseOrder $purchaseOrder): bool
+    {
+        return $user->hasRole(UserRole::Purchasing, UserRole::Admin)
+            && in_array($purchaseOrder->status, [
+                PoStatus::Confirmed,
+                PoStatus::InProgress,
+                PoStatus::Completed,
+            ], true);
+    }
+
+    /**
+     * Deliberately narrower than view() — this is an internal SDI/RM
+     * document (proof of BOD sign-off), not something Supplier OHP needs,
+     * matching the same hide-from-OHP treatment as the PO's status timeline.
+     */
+    public function viewSignedPo(User $user, PurchaseOrder $purchaseOrder): bool
+    {
+        if ($user->isSdiStaff()) {
+            return true;
+        }
+
+        return $user->hasRole(UserRole::SupplierRm)
+            && $user->company_id
+            && (int) $purchaseOrder->supplier_rm_id === (int) $user->company_id;
+    }
 }

@@ -52,6 +52,10 @@ class UpdateUserRequest extends FormRequest
                 'max:255',
                 Rule::unique('users', 'email')->ignore($user->id),
             ],
+            'phone' => [
+                Rule::requiredIf(fn () => $this->input('role') === UserRole::SupplierRm->value),
+                'nullable', 'string', 'max:30',
+            ],
             'password' => ['nullable', 'confirmed', Password::defaults()],
             'role' => ['required', Rule::in($allowedRoles)],
             'supplier_code' => ['nullable', 'string'],

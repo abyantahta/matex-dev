@@ -52,6 +52,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->name('purchase-orders.approve');
     Route::post('purchase-orders/{purchase_order}/reject', [PurchaseOrderController::class, 'reject'])
         ->name('purchase-orders.reject');
+    Route::post('purchase-orders/{purchase_order}/signed-po', [PurchaseOrderController::class, 'uploadSignedPo'])
+        ->name('purchase-orders.upload-signed-po');
+    Route::get('purchase-orders/{purchase_order}/signed-po', [PurchaseOrderController::class, 'downloadSignedPo'])
+        ->name('purchase-orders.download-signed-po');
 
     Route::get('delivery-notes', [DeliveryNoteController::class, 'index'])->name('delivery-notes.index');
     Route::get('delivery-notes/{delivery_note}', [DeliveryNoteController::class, 'show'])->name('delivery-notes.show');
