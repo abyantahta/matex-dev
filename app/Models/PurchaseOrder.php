@@ -20,12 +20,14 @@ class PurchaseOrder extends Model
         'status',
         'created_by',
         'notes',
+        'rm_price_notes',
         'rejection_reason',
         'submitted_at',
         'rm_confirmed_at',
         'purchasing_approved_at',
         'qad_status',
         'qad_po_number',
+        'qad_remarks',
         'qad_payload',
         'qad_response',
         'signed_po_path',
@@ -137,6 +139,11 @@ class PurchaseOrder extends Model
                 'status',
                 ScheduleStatus::sentAndApprovedValues()
             ),
+            'schedules as unreceived_schedules_count' => fn (Builder $q) => $q->where(
+                'status',
+                '!=',
+                ScheduleStatus::Received->value
+            ),
         ]);
     }
 
@@ -148,16 +155,21 @@ class PurchaseOrder extends Model
         if (array_key_exists('schedules_count', $this->attributes)
             && array_key_exists('unapproved_schedules_count', $this->attributes)) {
             return (int) $this->schedules_count > 0
-                && (int) $this->unapproved_schedules_count === 0;
+                && (int) $this->unreceived_schedules_count === 0;
         }
 
-        if (! $this->schedules()->exists()) {
+        if (! $this->deliveryNotes()->exists()) {
             return false;
         }
 
         return ! $this->schedules()
-            ->whereNotIn('status', ScheduleStatus::sentAndApprovedValues())
+            ->where('status', '!=', ScheduleStatus::Received->value)
             ->exists();
+    }
+
+    public function isIssuedInQad(): bool
+    {
+        return filled($this->qad_po_number) || $this->qad_status === QadSyncStatus::Success;
     }
 
     public function restrictRelationsFor(User $user): static

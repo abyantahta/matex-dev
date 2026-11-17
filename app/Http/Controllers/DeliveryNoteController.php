@@ -6,6 +6,7 @@ use App\Actions\DeliveryNote\ConfirmByOhp;
 use App\Actions\DeliveryNote\ConfirmShipment;
 use App\Actions\DeliveryNote\GenerateDns;
 use App\Enums\ScheduleStatus;
+use App\Support\DnQtyCap;
 use App\Http\Requests\ConfirmOhpRequest;
 use App\Http\Requests\GenerateDnRequest;
 use App\Http\Requests\UpdateDnDeliveryDateRequest;
@@ -71,6 +72,11 @@ class DeliveryNoteController extends Controller
                 ? asset('storage/'.$deliveryNote->ohpConfirmation->sj_document_path)
                 : null,
             'receivingEnabled' => (bool) config('qad.receiving_enabled'),
+            'qtyCap' => [
+                'po_qty' => DnQtyCap::poQty($deliveryNote->purchaseOrderItem),
+                'other_qty' => DnQtyCap::otherNotesQty($deliveryNote),
+                'max_qty' => DnQtyCap::maxFor($deliveryNote),
+            ],
         ]);
     }
 
@@ -118,11 +124,24 @@ class DeliveryNoteController extends Controller
         UpdateDnDeliveryDateRequest $request,
         DeliveryNote $deliveryNote,
     ): RedirectResponse {
-        $deliveryNote->update([
-            'delivery_date' => $request->validated('delivery_date'),
-        ]);
+        $data = $request->validated();
+        $payload = [
+            'delivery_date' => $data['delivery_date'],
+        ];
 
-        return back()->with('success', 'Tanggal pengiriman DN diperbarui. Silakan reprint DN.');
+        if (array_key_exists('qty', $data) && $data['qty'] !== null) {
+            $payload['qty'] = (int) $data['qty'];
+        }
+
+        $deliveryNote->update($payload);
+
+        if (isset($payload['qty']) && $deliveryNote->deliverySchedule) {
+            $deliveryNote->deliverySchedule->update([
+                'qty_confirmed' => $payload['qty'],
+            ]);
+        }
+
+        return back()->with('success', 'Surat jalan diperbarui. Silakan reprint DN.');
     }
 
     public function confirmOhp(

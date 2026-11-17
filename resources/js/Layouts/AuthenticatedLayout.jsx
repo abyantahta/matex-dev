@@ -13,26 +13,86 @@ import {
 import { Link, usePage } from '@inertiajs/react';
 import { useMemo, useState } from 'react';
 
-function navItemsForRole(role) {
-    const base = [
-        { href: 'dashboard', label: 'Dashboard', match: 'dashboard' },
-        { href: 'purchase-orders.index', label: 'Purchase Orders', match: 'purchase-orders.*' },
+function transactionItemsForRole(role) {
+    const items = [
+        { href: 'purchase-orders.index', label: 'Purchase Order', match: 'purchase-orders.*' },
         { href: 'delivery-notes.index', label: 'Delivery Notes', match: 'delivery-notes.*' },
     ];
 
     if (['supplier_rm', 'purchasing', 'admin'].includes(role)) {
-        base.splice(1, 0, { href: 'forecasts.index', label: 'Forecast', match: 'forecasts.*' });
+        items.splice(2, 0, { href: 'forecasts.index', label: 'Forecast', match: 'forecasts.*' });
     }
 
     if (['ppic', 'admin'].includes(role)) {
-        base.push({ href: 'receivings.index', label: 'Receiving', match: 'receivings.*' });
+        items.push({ href: 'receivings.index', label: 'Receiving', match: 'receivings.*' });
     }
 
-    if (['supplier_rm', 'purchasing', 'admin', 'ppic'].includes(role)) {
-        base.push({ href: 'billing.index', label: 'Billing / Receiving', match: 'billing.*' });
+    return items;
+}
+
+function monitoringItemsForRole(role) {
+    const items = [];
+
+    if (['purchasing', 'admin', 'supplier_ohp'].includes(role)) {
+        items.push({
+            href: 'monitoring.kedatangan',
+            label: 'Monitoring Kedatangan di OHP',
+            match: 'monitoring.kedatangan',
+        });
     }
 
-    return base;
+    if (['purchasing', 'admin', 'supplier_rm'].includes(role)) {
+        items.push({
+            href: 'monitoring.pengiriman',
+            label: 'Monitoring Pengiriman',
+            match: 'monitoring.pengiriman',
+        });
+    }
+
+    return items;
+}
+
+function HoverNav({ label, active, children }) {
+    return (
+        <div className="group relative">
+            <button
+                type="button"
+                className={
+                    'group/btn relative inline-flex items-center gap-1 px-1 pt-1 text-sm font-medium leading-5 transition duration-220 ease-matex focus:outline-none ' +
+                    (active ? 'font-semibold text-brand' : 'text-ink-muted hover:text-ink')
+                }
+            >
+                <span>{label}</span>
+                <svg
+                    className={
+                        'h-3.5 w-3.5 ' + (active ? 'text-brand' : 'text-ink-faint group-hover:text-ink-muted')
+                    }
+                    viewBox="0 0 20 20"
+                    fill="currentColor"
+                    aria-hidden="true"
+                >
+                    <path
+                        fillRule="evenodd"
+                        d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"
+                        clipRule="evenodd"
+                    />
+                </svg>
+                <span
+                    className={
+                        'absolute inset-x-0 -bottom-px h-0.5 origin-left rounded-full bg-brand transition duration-320 ease-matex ' +
+                        (active
+                            ? 'scale-x-100 opacity-100'
+                            : 'scale-x-0 opacity-0 group-hover:scale-x-100 group-hover:opacity-70')
+                    }
+                />
+            </button>
+            <div className="invisible absolute left-0 top-full z-50 pt-2 opacity-0 transition duration-150 group-hover:visible group-hover:opacity-100">
+                <div className="w-72 rounded-md bg-surface py-2 shadow-lg ring-1 ring-black ring-opacity-5">
+                    {children}
+                </div>
+            </div>
+        </div>
+    );
 }
 
 function MasterDataNav({ role }) {
@@ -116,9 +176,14 @@ export default function AuthenticatedLayout({ header, children }) {
     const user = auth.user;
     const [showingNavigationDropdown, setShowingNavigationDropdown] = useState(false);
     const [showingMasterMobile, setShowingMasterMobile] = useState(false);
-    const items = useMemo(() => navItemsForRole(user.role), [user.role]);
+    const [showingTransactionMobile, setShowingTransactionMobile] = useState(false);
+    const [showingMonitoringMobile, setShowingMonitoringMobile] = useState(false);
+    const transactionItems = useMemo(() => transactionItemsForRole(user.role), [user.role]);
+    const monitoringItems = useMemo(() => monitoringItemsForRole(user.role), [user.role]);
     const masterItems = useMemo(() => masterNavForRole(user.role), [user.role]);
     const showMaster = canAccessMasterData(user.role);
+    const transactionActive = transactionItems.some((item) => route().current(item.match));
+    const monitoringActive = monitoringItems.some((item) => route().current(item.match));
 
     return (
         <div className="min-h-screen bg-canvas">
@@ -142,15 +207,41 @@ export default function AuthenticatedLayout({ header, children }) {
                             </Link>
 
                             <div className="hidden items-stretch gap-5 sm:ms-8 sm:flex lg:ms-10">
-                                {items.map((item) => (
-                                    <NavLink
-                                        key={item.href}
-                                        href={route(item.href)}
-                                        active={route().current(item.match)}
-                                    >
-                                        {item.label}
-                                    </NavLink>
-                                ))}
+                                <NavLink href={route('dashboard')} active={route().current('dashboard')}>
+                                    Dashboard
+                                </NavLink>
+                                <HoverNav label="Transaction" active={transactionActive}>
+                                    {transactionItems.map((item) => (
+                                        <Dropdown.Link
+                                            key={item.href}
+                                            href={route(item.href)}
+                                            className={
+                                                route().current(item.match)
+                                                    ? '!bg-brand-muted !font-semibold !text-brand-deep'
+                                                    : ''
+                                            }
+                                        >
+                                            {item.label}
+                                        </Dropdown.Link>
+                                    ))}
+                                </HoverNav>
+                                {monitoringItems.length > 0 && (
+                                    <HoverNav label="Monitoring" active={monitoringActive}>
+                                        {monitoringItems.map((item) => (
+                                            <Dropdown.Link
+                                                key={item.href}
+                                                href={route(item.href)}
+                                                className={
+                                                    route().current(item.match)
+                                                        ? '!bg-brand-muted !font-semibold !text-brand-deep'
+                                                        : ''
+                                                }
+                                            >
+                                                {item.label}
+                                            </Dropdown.Link>
+                                        ))}
+                                    </HoverNav>
+                                )}
                                 {showMaster && <MasterDataNav role={user.role} />}
                             </div>
                         </div>
@@ -238,15 +329,49 @@ export default function AuthenticatedLayout({ header, children }) {
                     }
                 >
                     <div className="space-y-1 py-3">
-                        {items.map((item) => (
-                            <ResponsiveNavLink
-                                key={item.href}
-                                href={route(item.href)}
-                                active={route().current(item.match)}
-                            >
-                                {item.label}
-                            </ResponsiveNavLink>
-                        ))}
+                        <ResponsiveNavLink href={route('dashboard')} active={route().current('dashboard')}>
+                            Dashboard
+                        </ResponsiveNavLink>
+                        <button
+                            type="button"
+                            className="flex w-full items-center justify-between border-l-4 border-transparent py-2.5 pe-4 ps-3 text-base font-medium text-ink-muted"
+                            onClick={() => setShowingTransactionMobile((v) => !v)}
+                        >
+                            <span>Transaction</span>
+                        </button>
+                        {(showingTransactionMobile || transactionActive) &&
+                            transactionItems.map((item) => (
+                                <ResponsiveNavLink
+                                    key={item.href}
+                                    href={route(item.href)}
+                                    active={route().current(item.match)}
+                                    className="ps-6 text-sm"
+                                >
+                                    {item.label}
+                                </ResponsiveNavLink>
+                            ))}
+                        {monitoringItems.length > 0 && (
+                            <>
+                                <button
+                                    type="button"
+                                    className="flex w-full items-center justify-between border-l-4 border-transparent py-2.5 pe-4 ps-3 text-base font-medium text-ink-muted"
+                                    onClick={() => setShowingMonitoringMobile((v) => !v)}
+                                >
+                                    <span>Monitoring</span>
+                                </button>
+                                {(showingMonitoringMobile || monitoringActive) &&
+                                    monitoringItems.map((item) => (
+                                        <ResponsiveNavLink
+                                            key={item.href}
+                                            href={route(item.href)}
+                                            active={route().current(item.match)}
+                                            className="ps-6 text-sm"
+                                        >
+                                            {item.label}
+                                        </ResponsiveNavLink>
+                                    ))}
+                            </>
+                        )}
 
                         {showMaster && (
                             <div className="pt-1">

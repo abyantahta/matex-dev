@@ -17,8 +17,10 @@ class ConfirmByRmRequest extends FormRequest
     /**
      * Supplier RM mengirim alokasi qty per (item × tanggal). Jadwal dari
      * Purchasing hanya usulan — RM bebas memindah/memecah/mengubah qty,
-     * selama tanggalnya masih di bulan due date PO (satu kolom per hari di
-     * matrix konfirmasi). Qty 0 = tanggal itu dibatalkan.
+     * termasuk total di atas qty order, selama tanggalnya masih di bulan
+     * due date PO. Over ditandai untuk review; Purchasing yang ACC atau
+     * tolak. Qty 0 = tanggal itu dibatalkan. Setelah PO QAD terbit, cap
+     * qty berlaku di ubah DN — bukan di langkah ini.
      */
     public function rules(): array
     {
@@ -41,6 +43,7 @@ class ConfirmByRmRequest extends FormRequest
                 $dueDate ? 'before_or_equal:'.$dueDate->copy()->endOfMonth()->toDateString() : null,
             ]),
             'schedules.*.qty_confirmed' => ['required', 'integer', 'min:0'],
+            'rm_price_notes' => ['nullable', 'string', 'max:2000'],
         ];
     }
 

@@ -7,6 +7,7 @@ use App\Enums\ScheduleStatus;
 use App\Models\DeliveryNote;
 use App\Models\OhpConfirmation;
 use App\Models\User;
+use App\Support\StoresPublicUploads;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -14,6 +15,7 @@ use Illuminate\Validation\ValidationException;
 class ConfirmByOhp
 {
     use LogsPoStatus;
+    use StoresPublicUploads;
 
     public function execute(DeliveryNote $dn, User $user, UploadedFile $document, ?string $notes = null): DeliveryNote
     {
@@ -32,7 +34,13 @@ class ConfirmByOhp
         }
 
         return DB::transaction(function () use ($dn, $schedule, $user, $document, $notes) {
-            $path = $document->store('sj-documents', 'public');
+            try {
+                $path = $this->storePublicUpload($document, 'sj-documents');
+            } catch (\RuntimeException $e) {
+                throw ValidationException::withMessages([
+                    'sj_document' => 'File gagal diunggah ke storage server.',
+                ]);
+            }
 
             OhpConfirmation::create([
                 'delivery_note_id' => $dn->id,

@@ -16,6 +16,7 @@ class QadItemController extends Controller
     public function index(Request $request): Response
     {
         $items = QadItem::query()
+            ->rawMaterial()
             ->search($request->string('q')->toString() ?: null)
             ->orderBy('description')
             ->paginate(25)
@@ -26,8 +27,8 @@ class QadItemController extends Controller
             'filters' => [
                 'q' => $request->string('q')->toString(),
             ],
-            'lastSyncedAt' => QadItem::max('last_synced_at'),
-            'totalItems' => QadItem::count(),
+            'lastSyncedAt' => QadItem::query()->rawMaterial()->max('last_synced_at'),
+            'totalItems' => QadItem::query()->rawMaterial()->count(),
             'syncStatus' => Cache::get(SyncQadItemsJob::CACHE_KEY),
         ]);
     }

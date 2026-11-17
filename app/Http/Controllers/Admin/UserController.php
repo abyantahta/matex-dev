@@ -79,6 +79,7 @@ class UserController extends Controller
             'password' => $data['password'],
             'role' => $data['role'],
             'company_id' => $this->resolveCompanyId($data['role'], $data['supplier_code'] ?? null),
+            'broadcast_emails' => $data['broadcast_emails'] ?? [],
             'email_verified_at' => now(),
         ]);
 
@@ -109,6 +110,7 @@ class UserController extends Controller
             'phone' => $data['phone'] ?? null,
             'role' => $data['role'],
             'company_id' => $this->resolveCompanyId($data['role'], $data['supplier_code'] ?? null),
+            'broadcast_emails' => $data['broadcast_emails'] ?? [],
         ];
 
         if (! empty($data['password'])) {

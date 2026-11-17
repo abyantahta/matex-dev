@@ -115,4 +115,10 @@ return [
         'name' => env('MAIL_FROM_NAME', env('APP_NAME', 'Laravel')),
     ],
 
+    /*
+    | Kosongkan MAIL_ALWAYS_TO di production. Isi hanya untuk UAT
+    | (semua email dialihkan ke satu inbox).
+    */
+    'always_to' => env('MAIL_ALWAYS_TO'),
+
 ];

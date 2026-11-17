@@ -21,6 +21,11 @@ class QadItem extends Model
         return $query->where('is_active', true);
     }
 
+    public function scopeRawMaterial($query)
+    {
+        return $query->where('prod_line', 'RM');
+    }
+
     public function scopeSearch($query, ?string $term)
     {
         if (blank($term)) {

@@ -14,6 +14,7 @@ use App\Services\Qad\QadClientInterface;
 use App\Services\Qad\QadReceivingClient;
 use App\Services\Qad\QadSoapClient;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Vite;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Facades\URL;
@@ -30,6 +31,10 @@ class AppServiceProvider extends ServiceProvider
     {
         if (config('app.env') === 'production') {
             URL::forceScheme('https');
+        }
+
+        if (filled(config('mail.always_to'))) {
+            Mail::alwaysTo(config('mail.always_to'));
         }
         // Vite::prefetch(concurrency: 3);
 

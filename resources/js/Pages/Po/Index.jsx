@@ -13,42 +13,24 @@ function ohpLabels(po) {
     ].join(', ');
 }
 
-function FulfillmentBadge({ po }) {
-    return (
-        <StatusBadge
-            type="fulfillment"
-            value={po.is_closed ? 'closed' : 'open'}
-            title={
-                po.is_closed
-                    ? 'Seluruh DN sudah dikirim dan sudah di-approve'
-                    : 'Masih ada DN yang belum dikirim atau belum di-approve'
-            }
-        />
-    );
-}
+function PoStatusCell({ po }) {
+    const issued = Boolean(po.qad_po_number);
 
-const SIGNED_PO_RELEVANT_STATUSES = ['confirmed', 'in_progress', 'completed'];
-
-function SignedPoBadge({ po }) {
-    if (!SIGNED_PO_RELEVANT_STATUSES.includes(po.status)) {
-        return null;
+    if (issued) {
+        return (
+            <StatusBadge
+                type="fulfillment"
+                value={po.is_closed ? 'closed' : 'open'}
+                title={
+                    po.is_closed
+                        ? 'Semua DN sudah di-receive PPIC'
+                        : 'PO sudah terbit di QAD, masih ada DN yang belum received'
+                }
+            />
+        );
     }
 
-    return po.has_signed_po ? (
-        <span
-            title="Signed PO sudah diunggah"
-            className="inline-flex items-center rounded-md bg-brand-muted px-2 py-0.5 text-[0.6875rem] font-semibold tracking-wide text-brand-deep ring-1 ring-brand-line"
-        >
-            Signed PO ✓
-        </span>
-    ) : (
-        <span
-            title="Signed PO (BOD) belum diunggah"
-            className="inline-flex items-center rounded-md bg-amber-50 px-2 py-0.5 text-[0.6875rem] font-semibold tracking-wide text-amber-900 ring-1 ring-amber-200/80"
-        >
-            Signed PO belum
-        </span>
-    );
+    return <StatusBadge type="po" value={po.status} />;
 }
 
 export default function Index({ orders, filters }) {
@@ -144,11 +126,7 @@ export default function Index({ orders, filters }) {
                                             {new Date(po.due_date).toLocaleDateString('id-ID')}
                                         </td>
                                         <td className="px-4 py-3">
-                                            <div className="flex flex-wrap items-center gap-1.5">
-                                                <StatusBadge type="po" value={po.status} />
-                                                <FulfillmentBadge po={po} />
-                                                <SignedPoBadge po={po} />
-                                            </div>
+                                            <PoStatusCell po={po} />
                                         </td>
                                     </tr>
                                 ))}

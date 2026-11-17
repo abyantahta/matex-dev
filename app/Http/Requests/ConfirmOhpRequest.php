@@ -9,7 +9,7 @@ class ConfirmOhpRequest extends FormRequest
 {
     use AcceptsBase64Uploads;
 
-    public const MAX_KB = 5120;
+    public const MAX_KB = 10240;
 
     public function authorize(): bool
     {

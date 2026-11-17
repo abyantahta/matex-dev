@@ -54,6 +54,14 @@ export const MASTER_NAV_ITEMS = [
         roles: ['admin', 'purchasing'],
     },
     {
+        key: 'prices',
+        route: 'admin.prices.index',
+        label: 'Harga',
+        description: 'Harga default per kg untuk item RM',
+        match: 'admin.prices.*',
+        roles: ['admin', 'purchasing'],
+    },
+    {
         key: 'discipline',
         route: 'admin.discipline.index',
         label: 'Kedisiplinan RM',

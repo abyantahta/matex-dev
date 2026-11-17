@@ -34,6 +34,7 @@ class UpdatePurchaseOrder
                 $poItem = $po->items()->create([
                     'item_id' => $item->id,
                     'qty_ordered' => $itemData['qty_ordered'],
+                    'unit_price' => $itemData['unit_price'] ?? $item->price,
                 ]);
 
                 foreach ($itemData['schedules'] as $schedule) {

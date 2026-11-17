@@ -4,14 +4,14 @@ import PrimaryButton from '@/Components/PrimaryButton';
 import StatusBadge from '@/Components/StatusBadge';
 import TextInput from '@/Components/TextInput';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
-import { formatQty } from '@/utils/qty';
+import { formatQty, isQtyInput, toNum } from '@/utils/qty';
 import { encodeUploadField, formatFileSize } from '@/utils/upload';
 import { Head, router, useForm, usePage } from '@inertiajs/react';
 import { useState } from 'react';
 
-const SJ_DOCUMENT_MAX_MB = 5;
+const SJ_DOCUMENT_MAX_MB = 10;
 
-export default function Show({ note, sjUrl, receivingEnabled }) {
+export default function Show({ note, sjUrl, receivingEnabled, qtyCap }) {
     const { auth, errors } = usePage().props;
     const role = auth.user.role;
     const status = note.delivery_schedule?.status;
@@ -32,6 +32,12 @@ export default function Show({ note, sjUrl, receivingEnabled }) {
         ohpForm.clearErrors('sj_document');
         if (!file) {
             ohpForm.setData((prev) => ({ ...prev, sj_document_base64: null, sj_document_name: null }));
+            return;
+        }
+        const allowed = /\/(jpeg|jpg|png|pdf)$/i.test(file.type) || /\.(jpe?g|png|pdf)$/i.test(file.name || '');
+        if (!allowed) {
+            ohpForm.setData((prev) => ({ ...prev, sj_document_base64: null, sj_document_name: null }));
+            ohpForm.setError('sj_document', 'File harus berformat JPG, PNG, atau PDF.');
             return;
         }
         if (file.size > SJ_DOCUMENT_MAX_MB * 1024 * 1024) {
@@ -55,7 +61,11 @@ export default function Show({ note, sjUrl, receivingEnabled }) {
 
     const dateForm = useForm({
         delivery_date: currentDeliveryDate,
+        qty: String(note.qty ?? ''),
     });
+    const liveTotal = (qtyCap?.other_qty || 0) + toNum(dateForm.data.qty);
+    const poQty = qtyCap?.po_qty || 0;
+    const qtyOver = liveTotal > poQty;
 
     const canShip =
         role === 'supplier_rm' &&
@@ -157,10 +167,10 @@ export default function Show({ note, sjUrl, receivingEnabled }) {
 
                     {canEditDate && (
                         <section className="ui-panel p-5">
-                            <h3 className="font-semibold text-ink">Ubah Tanggal Pengiriman</h3>
+                            <h3 className="font-semibold text-ink">Ubah Tanggal & Qty</h3>
                             <p className="mt-1 text-sm text-ink-muted">
-                                Default mengikuti plan. Ubah bila tanggal di DN perlu disesuaikan,
-                                lalu reprint DN.
+                                Default mengikuti plan. Ubah bila tanggal atau qty DN perlu
+                                disesuaikan, lalu reprint DN.
                             </p>
                             <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-end">
                                 <div className="sm:w-56">
@@ -178,18 +188,37 @@ export default function Show({ note, sjUrl, receivingEnabled }) {
                                         className="mt-1"
                                     />
                                 </div>
+                                <div className="sm:w-40">
+                                    <InputLabel value="Qty (kg)" />
+                                    <TextInput
+                                        type="text"
+                                        inputMode="numeric"
+                                        className="mt-1 w-full"
+                                        value={dateForm.data.qty}
+                                        onChange={(e) => {
+                                            if (isQtyInput(e.target.value)) {
+                                                dateForm.setData('qty', e.target.value);
+                                            }
+                                        }}
+                                    />
+                                    <InputError message={dateForm.errors.qty} className="mt-1" />
+                                </div>
                                 <PrimaryButton
                                     className="bg-brand"
-                                    disabled={dateForm.processing}
+                                    disabled={dateForm.processing || qtyOver}
                                     onClick={() =>
                                         dateForm.post(
                                             route('delivery-notes.update-delivery-date', note.id),
                                         )
                                     }
                                 >
-                                    Simpan Tanggal
+                                    Simpan
                                 </PrimaryButton>
                             </div>
+                            <p className={`mt-2 text-sm ${qtyOver ? 'font-semibold text-rose-700' : 'text-ink-muted'}`}>
+                                Total surat jalan saat ini {formatQty(liveTotal)} kg dari {formatQty(poQty)} kg.
+                                {qtyOver ? ' Tidak boleh melebihi qty PO.' : ''}
+                            </p>
                         </section>
                     )}
 

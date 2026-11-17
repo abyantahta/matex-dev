@@ -5,6 +5,7 @@ import StatusBadge from '@/Components/StatusBadge';
 import TextInput from '@/Components/TextInput';
 import Timeline from '@/Components/Timeline';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
+import { formatPrice, isPriceInput } from '@/utils/money';
 import { formatQty, isQtyInput, roundQty, toNum } from '@/utils/qty';
 import { encodeUploadField, formatFileSize } from '@/utils/upload';
 import {
@@ -444,6 +445,15 @@ export default function Show({ order, hideInternalHistory = false }) {
     const { auth } = usePage().props;
     const role = auth.user.role;
     const [rejectReason, setRejectReason] = useState('');
+    const [qadRemarks, setQadRemarks] = useState('');
+    const [showRemarksModal, setShowRemarksModal] = useState(false);
+    const [priceDrafts, setPriceDrafts] = useState(() => {
+        const initial = {};
+        (order.items || []).forEach((item) => {
+            initial[item.id] = formatPrice(item.unit_price);
+        });
+        return initial;
+    });
     const [dnDrafts, setDnDrafts] = useState(() => {
         const initial = {};
         (order.schedules || []).forEach((s) => {
@@ -460,7 +470,10 @@ export default function Show({ order, hideInternalHistory = false }) {
     // Draft konfirmasi RM per cell (item × tanggal). RM bebas mix & match:
     // isi tanggal baru, kosongkan tanggal rencana, ubah qty — Purchasing yang
     // menilai lagi lewat badge OK / Minus / Over saat approve.
-    const rmForm = useForm({ cells: initialCellDrafts(order, dueMonth) });
+    const rmForm = useForm({
+        cells: initialCellDrafts(order, dueMonth),
+        rm_price_notes: '',
+    });
 
     const canEdit = role === 'purchasing' || role === 'admin';
     const canSubmit = canEdit && order.status === 'draft';
@@ -550,9 +563,31 @@ export default function Show({ order, hideInternalHistory = false }) {
 
     const matrixMode = canConfirmRm ? 'edit' : showRmChanges || canApprove ? 'review' : 'view';
 
-    const pendingDnSchedules = useMemo(
-        () => (order.schedules || []).filter((s) => !s.delivery_note),
+    const visibleSchedules = useMemo(
+        () =>
+            (order.schedules || []).filter((s) => {
+                const qty = toNum(s.qty_confirmed ?? s.qty);
+                if (qty <= 0 && !s.delivery_note) {
+                    return false;
+                }
+                return s.status === 'planned';
+            }),
         [order.schedules],
+    );
+
+    const pendingDnSchedules = useMemo(
+        () => visibleSchedules.filter((s) => !s.delivery_note),
+        [visibleSchedules],
+    );
+
+    const rmItemsOverQty = useMemo(
+        () =>
+            canConfirmRm
+                ? order.items.filter(
+                      (item) => itemDraftTotal(rmForm.data.cells, item.id) > toNum(item.qty_ordered),
+                  )
+                : [],
+        [canConfirmRm, order.items, rmForm.data.cells],
     );
 
     const updateCellQty = (itemId, day, qty) => {
@@ -582,6 +617,7 @@ export default function Show({ order, hideInternalHistory = false }) {
         }
         rmForm.transform((data) => ({
             schedules: cellDraftsToSchedules(data.cells, dueMonth),
+            rm_price_notes: data.rm_price_notes || null,
         }));
         rmForm.post(route('purchase-orders.confirm-rm', order.id), { preserveScroll: true });
     };
@@ -600,16 +636,19 @@ export default function Show({ order, hideInternalHistory = false }) {
                             {order.po_number}
                         </h2>
                         <div className="mt-2 flex flex-wrap items-center gap-2">
-                            <StatusBadge type="po" value={order.status} />
-                            <StatusBadge
-                                type="fulfillment"
-                                value={order.is_closed ? 'closed' : 'open'}
-                                title={
-                                    order.is_closed
-                                        ? 'Seluruh DN sudah dikirim dan sudah di-approve'
-                                        : 'Masih ada DN yang belum dikirim atau belum di-approve'
-                                }
-                            />
+                            {order.qad_po_number ? (
+                                <StatusBadge
+                                    type="fulfillment"
+                                    value={order.is_closed ? 'closed' : 'open'}
+                                    title={
+                                        order.is_closed
+                                            ? 'Semua DN sudah di-receive PPIC'
+                                            : 'PO sudah terbit di QAD'
+                                    }
+                                />
+                            ) : (
+                                <StatusBadge type="po" value={order.status} />
+                            )}
                         </div>
                     </div>
                     <div className="flex flex-wrap gap-2">
@@ -662,6 +701,12 @@ export default function Show({ order, hideInternalHistory = false }) {
                                     <dt className="text-ink-muted">Dibuat oleh</dt>
                                     <dd className="font-medium">{order.creator?.name}</dd>
                                 </div>
+                                {order.qad_remarks && (
+                                    <div>
+                                        <dt className="text-ink-muted">Remarks QAD</dt>
+                                        <dd className="font-medium">{order.qad_remarks}</dd>
+                                    </div>
+                                )}
                             </dl>
                             {!hideInternalHistory && order.rejection_reason && (
                                 <div className="mt-4 rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800">
@@ -768,9 +813,9 @@ export default function Show({ order, hideInternalHistory = false }) {
                             </div>
                             <p className="mb-4 text-sm text-ink-muted">
                                 {canConfirmRm
-                                    ? 'Isi qty (kg) di tanggal mana pun dalam bulan due date — jadwal dari Purchasing hanya usulan awal, bebas dipindah, dipecah, atau diubah qty-nya. Cell kuning = beda dari rencana Purchasing. Kolom Status menunjukkan total per part sama / minus / over dari order.'
+                                    ? 'Isi qty (kg) di tanggal mana pun dalam bulan due date — jadwal dari Purchasing hanya usulan awal, bebas dipindah, dipecah, atau diubah qty-nya. Total boleh melebihi order; badge Over merah hanya penanda, Purchasing yang ACC atau tolak. Cell kuning = beda dari rencana Purchasing.'
                                     : canApprove || showRmChanges
-                                      ? 'Tabel perbandingan rencana vs konfirmasi RM. Hijau = OK, kuning = minus, merah = over.'
+                                      ? 'Tabel perbandingan rencana vs konfirmasi RM. Hijau = OK, kuning = minus, merah = over. Over boleh di-ACC — qty itulah yang tembak ke QAD.'
                                       : 'Alokasi qty per tanggal dalam bulan due date.'}
                             </p>
 
@@ -790,27 +835,16 @@ export default function Show({ order, hideInternalHistory = false }) {
                                 </div>
                             )}
 
-                            {canConfirmRm && (
-                                <p className="mt-3 text-xs text-ink-muted">
-                                    Tip: angka <span className="line-through">dicoret</span> dengan
-                                    garis putus-putus = rencana Purchasing yang dikosongkan (bukan
-                                    qty aktual). Kosongkan cell untuk membatalkan tanggal itu, isi
-                                    cell lain untuk menambah tanggal kirim. Total Confirm per part
-                                    dihitung otomatis dari semua cell berisi.
-                                </p>
-                            )}
                         </section>
 
                         {/* Detail DN / generate — tetap per jadwal */}
-                        {(canGenerateDn ||
-                            order.schedules.some((s) => s.delivery_note) ||
-                            ['confirmed', 'in_progress', 'completed'].includes(order.status)) && (
+                        {(canGenerateDn || visibleSchedules.length > 0) && (
                             <section className="ui-panel p-5">
                                 <h3 className="mb-4 font-semibold text-ink">
                                     Delivery Note & Status Jadwal
                                 </h3>
                                 <div className="space-y-3">
-                                    {order.schedules.map((schedule) => (
+                                    {visibleSchedules.map((schedule) => (
                                         <div
                                             key={schedule.id}
                                             className="rounded-lg border border-line p-4"
@@ -961,6 +995,18 @@ export default function Show({ order, hideInternalHistory = false }) {
                                                     >
                                                         {schedule.delivery_note.dn_number}
                                                     </Link>
+                                                    {role === 'supplier_rm' &&
+                                                        schedule.status === 'planned' && (
+                                                            <Link
+                                                                href={route(
+                                                                    'delivery-notes.show',
+                                                                    schedule.delivery_note.id,
+                                                                )}
+                                                                className="text-sm text-ink-muted hover:text-brand"
+                                                            >
+                                                                Ubah tanggal/qty
+                                                            </Link>
+                                                        )}
                                                     {schedule.delivery_note.delivery_date && (
                                                         <span className="text-ink-muted">
                                                             Kirim{' '}
@@ -1000,16 +1046,30 @@ export default function Show({ order, hideInternalHistory = false }) {
                                 <h3 className="font-semibold text-brand-deep">
                                     Konfirmasi Supplier RM
                                 </h3>
-                                <p className="mt-1 text-sm text-brand-deep">
-                                    Pastikan qty di tabel sudah sesuai (bilangan bulat, tanpa koma).
-                                    Setiap part minimal punya satu tanggal dengan qty.
-                                </p>
+                                <div className="mt-3">
+                                    <InputLabel value="Catatan harga ke Purchasing" />
+                                    <textarea
+                                        className="mt-1 w-full rounded-md border-line"
+                                        rows={2}
+                                        value={rmForm.data.rm_price_notes}
+                                        onChange={(e) =>
+                                            rmForm.setData('rm_price_notes', e.target.value)
+                                        }
+                                    />
+                                </div>
                                 {rmItemsWithoutQty.length > 0 && (
                                     <p className="mt-2 text-sm text-amber-800">
                                         Belum ada qty untuk:{' '}
                                         {rmItemsWithoutQty
                                             .map((item) => item.item?.item_number)
                                             .join(', ')}
+                                    </p>
+                                )}
+                                {rmItemsOverQty.length > 0 && (
+                                    <p className="mt-2 text-sm text-rose-700">
+                                        Qty melebihi order untuk:{' '}
+                                        {rmItemsOverQty.map((item) => item.item?.item_number).join(', ')}
+                                        . Boleh disubmit — Purchasing yang ACC atau tolak.
                                     </p>
                                 )}
                                 <PrimaryButton
@@ -1030,20 +1090,46 @@ export default function Show({ order, hideInternalHistory = false }) {
                                 <h3 className="font-semibold text-amber-900">
                                     Persetujuan Purchasing
                                 </h3>
-                                <p className="mt-1 text-sm text-amber-800">
-                                    Review tabel di atas. Perhatikan highlight{' '}
-                                    <strong>OK / Minus / Over</strong> per part dan per tanggal. Jika
-                                    OK, Supplier RM akan mengisi no. SJ internal lalu generate DN.
-                                </p>
-                                <div className="mt-4 flex flex-wrap gap-3">
-                                    <PrimaryButton
-                                        className="bg-emerald-700 hover:bg-emerald-800"
-                                        onClick={() =>
-                                            router.post(route('purchase-orders.approve', order.id))
-                                        }
-                                    >
-                                        Confirm OK
-                                    </PrimaryButton>
+                                {order.rm_price_notes && (
+                                    <div className="mt-3 rounded-md border border-amber-200 bg-surface px-3 py-2 text-sm">
+                                        <p className="font-medium text-ink">Catatan harga dari RM</p>
+                                        <p className="mt-1 text-ink-soft">{order.rm_price_notes}</p>
+                                    </div>
+                                )}
+                                <div className="mt-4 space-y-2">
+                                    {(order.items || []).map((item) => (
+                                        <div
+                                            key={item.id}
+                                            className="grid items-center gap-2 md:grid-cols-[1fr_180px]"
+                                        >
+                                            <div>
+                                                <p className="text-sm font-medium text-ink">
+                                                    {item.item?.item_number}
+                                                </p>
+                                                <p className="text-xs text-ink-muted">
+                                                    {item.item?.description}
+                                                </p>
+                                            </div>
+                                            <div>
+                                                <InputLabel value="Harga / kg (Rp)" />
+                                                <TextInput
+                                                    className="mt-1 w-full"
+                                                    value={priceDrafts[item.id] ?? ''}
+                                                    onChange={(e) => {
+                                                        if (isPriceInput(e.target.value)) {
+                                                            setPriceDrafts((prev) => ({
+                                                                ...prev,
+                                                                [item.id]: e.target.value.replace(
+                                                                    ',',
+                                                                    '.',
+                                                                ),
+                                                            }));
+                                                        }
+                                                    }}
+                                                />
+                                            </div>
+                                        </div>
+                                    ))}
                                 </div>
                                 <div className="mt-4 space-y-2">
                                     <InputLabel value="Alasan reject (jika ditolak)" />
@@ -1053,17 +1139,25 @@ export default function Show({ order, hideInternalHistory = false }) {
                                         value={rejectReason}
                                         onChange={(e) => setRejectReason(e.target.value)}
                                     />
-                                    <button
-                                        type="button"
-                                        className="rounded-md border border-rose-300 bg-surface px-3 py-2 text-sm font-medium text-rose-700"
-                                        onClick={() =>
-                                            router.post(route('purchase-orders.reject', order.id), {
-                                                reason: rejectReason,
-                                            })
-                                        }
-                                    >
-                                        Tolak & minta submit ulang
-                                    </button>
+                                    <div className="flex flex-wrap items-center gap-3">
+                                        <button
+                                            type="button"
+                                            className="rounded-md border border-rose-300 bg-surface px-3 py-2 text-sm font-medium text-rose-700"
+                                            onClick={() =>
+                                                router.post(route('purchase-orders.reject', order.id), {
+                                                    reason: rejectReason,
+                                                })
+                                            }
+                                        >
+                                            Tolak & minta submit ulang
+                                        </button>
+                                        <PrimaryButton
+                                            className="bg-emerald-700 hover:bg-emerald-800"
+                                            onClick={() => setShowRemarksModal(true)}
+                                        >
+                                            Confirm OK
+                                        </PrimaryButton>
+                                    </div>
                                 </div>
                             </section>
                         )}
@@ -1071,11 +1165,75 @@ export default function Show({ order, hideInternalHistory = false }) {
 
                     {!hideInternalHistory && (
                         <aside className="space-y-4">
-                            <section className="ui-panel p-5">
+                            <section className="ui-panel flex max-h-[calc(100dvh-6rem)] flex-col overflow-hidden p-5">
                                 <h3 className="mb-4 font-semibold text-ink">Timeline</h3>
-                                <Timeline logs={order.status_logs || []} />
+                                <div className="min-h-0 flex-1 overflow-y-auto pr-1">
+                                    <Timeline logs={order.status_logs || []} />
+                                </div>
                             </section>
                         </aside>
+                    )}
+
+                    {showRemarksModal && (
+                        <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 p-4">
+                            <div className="w-full max-w-md rounded-xl bg-surface p-5 shadow-lg">
+                                <h3 className="font-semibold text-ink">Confirm OK — Remarks QAD</h3>
+                                <p className="mt-1 text-sm text-ink-muted">
+                                    Remarks akan di-append setelah nomor draft, maks. 40 karakter
+                                    termasuk prefix.
+                                </p>
+                                <InputLabel value="Remarks" className="mt-3" />
+                                <textarea
+                                    className="mt-1 w-full rounded-md border-line"
+                                    rows={3}
+                                    maxLength={Math.max(
+                                        0,
+                                        40 - `${order.po_number}, `.length,
+                                    )}
+                                    value={qadRemarks}
+                                    onChange={(e) => setQadRemarks(e.target.value)}
+                                    autoFocus
+                                />
+                                <p className="mt-2 rounded-md bg-canvas-soft px-3 py-2 font-mono text-sm text-ink">
+                                    {(`${order.po_number}${qadRemarks.trim() ? `, ${qadRemarks.trim()}` : ''}`).slice(
+                                        0,
+                                        40,
+                                    )}
+                                </p>
+                                <p className="mt-1 text-xs text-ink-muted">
+                                    Pratinjau ke QAD (
+                                    {
+                                        (`${order.po_number}${qadRemarks.trim() ? `, ${qadRemarks.trim()}` : ''}`)
+                                            .slice(0, 40).length
+                                    }
+                                    /40)
+                                </p>
+                                <div className="mt-4 flex justify-end gap-2">
+                                    <button
+                                        type="button"
+                                        className="rounded-md border border-line px-3 py-2 text-sm"
+                                        onClick={() => setShowRemarksModal(false)}
+                                    >
+                                        Batal
+                                    </button>
+                                    <PrimaryButton
+                                        className="bg-emerald-700"
+                                        onClick={() => {
+                                            router.post(route('purchase-orders.approve', order.id), {
+                                                qad_remarks: qadRemarks,
+                                                items: (order.items || []).map((item) => ({
+                                                    id: item.id,
+                                                    unit_price: priceDrafts[item.id] || null,
+                                                })),
+                                            });
+                                            setShowRemarksModal(false);
+                                        }}
+                                    >
+                                        Confirm OK
+                                    </PrimaryButton>
+                                </div>
+                            </div>
+                        </div>
                     )}
                 </div>
             </div>

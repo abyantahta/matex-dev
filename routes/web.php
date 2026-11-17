@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Admin\AdminDashboardController;
 use App\Http\Controllers\Admin\CompanyController;
+use App\Http\Controllers\Admin\ItemPriceController;
 use App\Http\Controllers\Admin\QadItemController;
 use App\Http\Controllers\Admin\QadSupplierController;
 use App\Http\Controllers\Admin\SupplierDisciplineController;
@@ -10,6 +11,7 @@ use App\Http\Controllers\BillingController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DeliveryNoteController;
 use App\Http\Controllers\ForecastController;
+use App\Http\Controllers\MonitoringController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\PurchaseOrderController;
 use App\Http\Controllers\ReceivingController;
@@ -80,6 +82,15 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     Route::get('billing', [BillingController::class, 'index'])->name('billing.index');
 
+    Route::middleware('role:purchasing,admin,supplier_rm')->group(function () {
+        Route::get('monitoring/pengiriman', [MonitoringController::class, 'pengiriman'])
+            ->name('monitoring.pengiriman');
+    });
+    Route::middleware('role:purchasing,admin,supplier_ohp')->group(function () {
+        Route::get('monitoring/kedatangan', [MonitoringController::class, 'kedatangan'])
+            ->name('monitoring.kedatangan');
+    });
+
     // Master data: Purchasing (Mbak Dita) + Admin. Users kini juga bisa
     // dikelola Purchasing (kecuali akun Admin — lihat UserController).
     Route::middleware('role:admin,purchasing')->prefix('admin')->name('admin.')->group(function () {
@@ -108,6 +119,13 @@ Route::middleware(['auth', 'verified'])->group(function () {
         // Supplier RM/Supplier OHP tapi tidak bisa menyentuh akun Admin
         // (ditegakkan di StoreUserRequest/UpdateUserRequest/UserController).
         Route::resource('users', UserController::class)->except(['show']);
+
+        Route::prefix('prices')->name('prices.')->group(function () {
+            Route::get('/', [ItemPriceController::class, 'index'])->name('index');
+            Route::patch('/{qadItem}', [ItemPriceController::class, 'update'])->name('update');
+            Route::get('/export', [ItemPriceController::class, 'export'])->name('export');
+            Route::post('/import', [ItemPriceController::class, 'import'])->name('import');
+        });
     });
 
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');

@@ -10,6 +10,7 @@ use App\Models\PurchaseOrder;
 use App\Models\User;
 use App\Notifications\PurchaseOrderApprovedNotification;
 use App\Services\Qad\QadPurchaseOrderService;
+use App\Support\QadRemarks;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
@@ -22,7 +23,7 @@ class ApproveByPurchasing
 
     public function __construct(private QadPurchaseOrderService $qad) {}
 
-    public function execute(PurchaseOrder $po, User $user): PurchaseOrder
+    public function execute(PurchaseOrder $po, User $user, array $data = []): PurchaseOrder
     {
         if ($po->status !== PoStatus::AwaitingPurchasingOk) {
             throw ValidationException::withMessages([
@@ -30,7 +31,16 @@ class ApproveByPurchasing
             ]);
         }
 
-        $po = DB::transaction(function () use ($po, $user) {
+        $po = DB::transaction(function () use ($po, $user, $data) {
+            foreach ($data['items'] ?? [] as $row) {
+                if (! isset($row['id'])) {
+                    continue;
+                }
+
+                $po->items()->whereKey($row['id'])->update([
+                    'unit_price' => $row['unit_price'] ?? null,
+                ]);
+            }
             // Tanggal rencana yang dikosongkan RM (qty_confirmed 0) hanya
             // dipertahankan untuk review Purchasing. Setelah OK, buang agar
             // tidak muncul sebagai jadwal/DN yang harus dikirim.
@@ -40,14 +50,17 @@ class ApproveByPurchasing
                 ->where('qty_confirmed', 0)
                 ->delete();
 
+            $composedRemarks = QadRemarks::compose($po->po_number, $data['qad_remarks'] ?? null);
+
             $from = $po->status;
             $po->update([
                 'status' => PoStatus::Confirmed,
                 'purchasing_approved_at' => now(),
                 'rejection_reason' => null,
+                'qad_remarks' => $composedRemarks,
             ]);
 
-            $this->pushToQad($po);
+            $this->pushToQad($po, $data['qad_remarks'] ?? null);
 
             $notes = 'Purchasing mengonfirmasi OK — menunggu Supplier RM isi no. SJ internal & generate DN';
             $notes .= match ($po->qad_status) {
@@ -55,6 +68,7 @@ class ApproveByPurchasing
                 QadSyncStatus::Failed => ' · Sync ke QAD gagal.',
                 default => '',
             };
+            $notes .= " · Remarks QAD: {$composedRemarks}";
 
             $this->logStatus(
                 $po,
@@ -84,10 +98,10 @@ class ApproveByPurchasing
      * doesn't block the Purchasing approval itself, same as the Receiving →
      * QAD stub flow.
      */
-    private function pushToQad(PurchaseOrder $po): void
+    private function pushToQad(PurchaseOrder $po, ?string $remarks = null): void
     {
         try {
-            $result = $this->qad->createFromMatexPo($po);
+            $result = $this->qad->createFromMatexPo($po, $remarks);
         } catch (Throwable $e) {
             Log::error('QAD maintainPurchaseOrder failed', ['po_id' => $po->id, 'exception' => $e]);
 

@@ -6,7 +6,6 @@ use App\Enums\CompanyType;
 use App\Http\Requests\Concerns\AcceptsBase64Uploads;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
-use Illuminate\Validation\Validator;
 
 class StoreForecastRequest extends FormRequest
 {
@@ -33,28 +32,12 @@ class StoreForecastRequest extends FormRequest
             ],
             'period_month' => ['required', 'date_format:Y-m'],
             'notes' => ['nullable', 'string', 'max:2000'],
-            'file' => ['nullable', 'file', 'mimes:pdf,xlsx,xls,csv,jpg,jpeg,png', 'max:'.self::FILE_MAX_KB],
-            'items' => ['nullable', 'array'],
-            'items.*.item_id' => ['required', 'exists:items,id', 'distinct'],
-            'items.*.qty' => ['required', 'integer', 'gt:0'],
+            'file' => [
+                $this->route('forecast')?->file_path ? 'nullable' : 'required',
+                'file',
+                'mimes:pdf,xlsx,xls,csv',
+                'max:'.self::FILE_MAX_KB,
+            ],
         ];
-    }
-
-    public function withValidator(Validator $validator): void
-    {
-        $validator->after(function (Validator $validator) {
-            $items = $this->input('items', []);
-            $hasItems = collect(is_array($items) ? $items : [])
-                ->contains(fn ($item) => filled($item['item_id'] ?? null) && (int) ($item['qty'] ?? 0) > 0);
-            $hasFile = $this->hasFile('file');
-            $existing = $this->route('forecast');
-
-            if (! $hasItems && ! $hasFile && ! $existing?->file_path) {
-                $validator->errors()->add(
-                    'items',
-                    'Lengkapi minimal satu item forecast atau unggah file forecast.'
-                );
-            }
-        });
     }
 }

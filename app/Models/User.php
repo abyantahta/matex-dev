@@ -21,6 +21,7 @@ class User extends Authenticatable
         'password',
         'role',
         'company_id',
+        'broadcast_emails',
     ];
 
     protected $hidden = [
@@ -34,6 +35,7 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
             'role' => UserRole::class,
+            'broadcast_emails' => 'array',
         ];
     }
 
@@ -61,5 +63,16 @@ class User extends Authenticatable
     public function routeNotificationForWhatsApp(): ?string
     {
         return $this->phone;
+    }
+
+    /** Tembusan notifikasi — bukan untuk login. */
+    public function broadcastEmailList(): array
+    {
+        return collect($this->broadcast_emails ?? [])
+            ->map(fn ($email) => strtolower(trim((string) $email)))
+            ->filter(fn ($email) => $email !== '' && $email !== strtolower((string) $this->email))
+            ->unique()
+            ->values()
+            ->all();
     }
 }

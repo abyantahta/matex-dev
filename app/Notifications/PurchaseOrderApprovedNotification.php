@@ -4,19 +4,14 @@ namespace App\Notifications;
 
 use App\Models\PurchaseOrder;
 use App\Notifications\Channels\WhatsAppChannel;
+use App\Notifications\Concerns\FormatsPoMail;
 use Illuminate\Bus\Queueable;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
 
-/**
- * Sent to every Supplier RM user of a PO once Purchasing gives final OK
- * (ApproveByPurchasing) — the point where the ball moves to their side:
- * fill the internal SJ number and generate the DN. Independent of whether
- * the QAD push succeeded, since that's an internal sync concern, not
- * something the supplier needs to know about.
- */
 class PurchaseOrderApprovedNotification extends Notification
 {
+    use FormatsPoMail;
     use Queueable;
 
     public function __construct(private readonly PurchaseOrder $po) {}
@@ -29,17 +24,14 @@ class PurchaseOrderApprovedNotification extends Notification
     public function toWhatsApp(object $notifiable): string
     {
         $po = $this->po;
-        $lines = $po->items->map(function ($poItem) {
-            $qty = $poItem->qty_confirmed ?? $poItem->qty_ordered;
+        $lines = $po->items->map(
+            fn ($poItem) => '- '.$this->itemLine($poItem, $poItem->qty_confirmed ?? $poItem->qty_ordered)
+        )->implode("\n");
 
-            return "- {$poItem->item->item_number} ({$poItem->item->description}): {$qty} {$poItem->item->uom}";
-        })->implode("\n");
-
-        return "Halo {$notifiable->name},\n\n"
+        return "Dear {$notifiable->name},\n\n"
             ."PO *{$po->po_number}* telah dikonfirmasi OK oleh Purchasing PT. Sankei Dharma Indonesia.\n\n"
             ."{$lines}\n\n"
             .'Due date: '.$po->due_date->format('d M Y')."\n\n"
-            ."Mohon segera isi nomor Surat Jalan internal dan generate Delivery Note lewat portal Matex:\n"
             .route('purchase-orders.show', $po);
     }
 
@@ -48,20 +40,21 @@ class PurchaseOrderApprovedNotification extends Notification
         $po = $this->po;
 
         $mail = (new MailMessage)
-            ->subject("PO {$po->po_number} Dikonfirmasi Purchasing")
-            ->greeting("Halo {$notifiable->name},")
-            ->line("Purchase Order **{$po->po_number}** telah dikonfirmasi OK oleh Purchasing PT. Sankei Dharma Indonesia.")
+            ->subject("PO {$po->po_number} Dikonfirmasi Purchasing");
+
+        $this->greet($mail, $notifiable);
+        $mail->line("Purchase Order **{$po->po_number}** telah dikonfirmasi OK oleh Purchasing PT. Sankei Dharma Indonesia.")
             ->line('Rincian pesanan:');
 
         foreach ($po->items as $poItem) {
-            $qty = $poItem->qty_confirmed ?? $poItem->qty_ordered;
-            $mail->line("- {$poItem->item->item_number} ({$poItem->item->description}): {$qty} {$poItem->item->uom}");
+            $mail->line('- '.$this->itemLine($poItem, $poItem->qty_confirmed ?? $poItem->qty_ordered));
         }
 
-        return $mail
-            ->line('Due date: '.$po->due_date->format('d M Y'))
+        $mail->line('Due date: '.$po->due_date->format('d M Y'))
             ->line('Mohon segera isi nomor Surat Jalan internal dan generate Delivery Note melalui portal Matex.')
-            ->action('Buka PO di Portal Matex', route('purchase-orders.show', $po))
-            ->line('Terima kasih atas kerja samanya.');
+            ->action('Buka PO di Portal Matex', route('purchase-orders.show', $po));
+        $this->regards($mail, $this->purchasingUser($po));
+
+        return $this->withBroadcastCc($mail, $notifiable);
     }
 }

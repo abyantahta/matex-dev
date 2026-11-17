@@ -13,6 +13,7 @@ class PurchaseOrderItem extends Model
         'item_id',
         'qty_ordered',
         'qty_confirmed',
+        'unit_price',
         'qad_line_number',
     ];
 
@@ -21,6 +22,7 @@ class PurchaseOrderItem extends Model
         return [
             'qty_ordered' => 'integer',
             'qty_confirmed' => 'integer',
+            'unit_price' => 'decimal:4',
             'qad_line_number' => 'integer',
         ];
     }

@@ -4,6 +4,7 @@ import PrimaryButton from '@/Components/PrimaryButton';
 import SearchableSelect from '@/Components/SearchableSelect';
 import TextInput from '@/Components/TextInput';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
+import { formatPrice, isPriceInput } from '@/utils/money';
 import { formatQty, isQtyInput, roundQty, toNum } from '@/utils/qty';
 import {
     isWeekendDay,
@@ -19,6 +20,7 @@ function emptyItem() {
     return {
         item_number: '',
         qty_ordered: '',
+        unit_price: '',
         ohp_supplier_code: '',
         schedules: [],
     };
@@ -136,6 +138,7 @@ function mapOrderToForm(order) {
                     item.qty_ordered === null || item.qty_ordered === undefined
                         ? ''
                         : String(toNum(item.qty_ordered)),
+                unit_price: formatPrice(item.unit_price),
                 ohp_supplier_code: schedules[0]?.ohp_supplier_code || '',
                 schedules,
             };
@@ -147,6 +150,7 @@ function cleanItemsForSubmit(items) {
     return items.map(({ ohp_supplier_code, ...item }) => ({
         ...item,
         qty_ordered: toNum(item.qty_ordered),
+        unit_price: item.unit_price === '' || item.unit_price === null ? null : Number(item.unit_price),
         schedules: (item.schedules || [])
             .filter((s) => s.scheduled_date && toNum(s.qty) > 0 && s.ohp_supplier_code)
             .map((s) => ({
@@ -230,6 +234,7 @@ export default function Form({ order, qadSuppliers, qadSuppliersOhp, qadItems, i
         if (key === 'item_number') {
             const defaultOhp = defaultOhpForItem(itemDefaults, value);
             next[index].ohp_supplier_code = defaultOhp;
+            next[index].unit_price = formatPrice(itemDefaults?.[value]?.price);
             next[index].schedules = (next[index].schedules || []).map((s) => ({
                 ...s,
                 ohp_supplier_code: defaultOhp,
@@ -411,7 +416,7 @@ export default function Form({ order, qadSuppliers, qadSuppliersOhp, qadItems, i
                             {data.items.map((item, itemIndex) => (
                                 <div
                                     key={itemIndex}
-                                    className="grid gap-3 rounded-lg border border-line bg-canvas-soft p-4 md:grid-cols-[1fr_180px_auto]"
+                                    className="grid gap-3 rounded-lg border border-line bg-canvas-soft p-4 md:grid-cols-[1fr_140px_160px_auto]"
                                 >
                                     <div>
                                         <InputLabel value="Item Number" />
@@ -450,6 +455,28 @@ export default function Form({ order, qadSuppliers, qadSuppliersOhp, qadItems, i
                                                     );
                                                 }
                                             }}
+                                        />
+                                        <InputError
+                                            message={errors[`items.${itemIndex}.qty_ordered`]}
+                                            className="mt-1"
+                                        />
+                                    </div>
+                                    <div>
+                                        <InputLabel value="Harga / kg (Rp)" />
+                                        <TextInput
+                                            type="text"
+                                            inputMode="decimal"
+                                            className="mt-1 w-full"
+                                            value={item.unit_price}
+                                            onChange={(e) => {
+                                                if (isPriceInput(e.target.value)) {
+                                                    updateItem(
+                                                        itemIndex,
+                                                        'unit_price',
+                                                        e.target.value.replace(',', '.'),
+                                                    );
+                                                }
+                                            }}
                                             onKeyDown={(e) => {
                                                 if (e.key === 'Enter') {
                                                     e.preventDefault();
@@ -458,7 +485,7 @@ export default function Form({ order, qadSuppliers, qadSuppliersOhp, qadItems, i
                                             }}
                                         />
                                         <InputError
-                                            message={errors[`items.${itemIndex}.qty_ordered`]}
+                                            message={errors[`items.${itemIndex}.unit_price`]}
                                             className="mt-1"
                                         />
                                     </div>
@@ -500,7 +527,7 @@ export default function Form({ order, qadSuppliers, qadSuppliersOhp, qadItems, i
                             <kbd className="rounded border border-line bg-surface px-1.5 py-0.5 font-semibold text-ink-soft">
                                 Enter
                             </kbd>{' '}
-                            di kolom qty untuk menambah baris item.
+                            di kolom harga untuk menambah baris item.
                         </p>
                         <InputError message={errors.items} className="mt-1" />
                     </div>

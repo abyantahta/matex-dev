@@ -3,6 +3,7 @@
 namespace App\Services\Qad;
 
 use App\Models\PurchaseOrder;
+use App\Support\QadRemarks;
 
 class QadPurchaseOrderService
 {
@@ -27,7 +28,7 @@ class QadPurchaseOrderService
      *
      * @return array{success: bool, payload: array, response: array, qad_po_number: ?string, line_numbers: array<int, int>}
      */
-    public function createFromMatexPo(PurchaseOrder $po): array
+    public function createFromMatexPo(PurchaseOrder $po, ?string $purchasingRemarks = null): array
     {
         $po->loadMissing('items.item', 'supplierRm');
 
@@ -44,6 +45,8 @@ class QadPurchaseOrderService
             $confirmedQty = (float) ($poItem->qty_confirmed ?? $poItem->qty_ordered);
             $qty = number_format($confirmedQty, 5, '.', '');
             $um = $this->esc($poItem->item->uom ?: 'KG');
+            $cost = $poItem->unit_price ?? $poItem->item?->price ?? $defaults['purchase_cost'];
+            $purCost = number_format((float) $cost, 5, '.', '');
 
             $payloadLines[] = [
                 'purchase_order_item_id' => $poItem->id,
@@ -64,7 +67,7 @@ class QadPurchaseOrderService
                 <qsvc:podQtyOpen>{$qty}</qsvc:podQtyOpen>
                 <qsvc:podUm>{$um}</qsvc:podUm>
                 <qsvc:podDueDate>{$dueDate}</qsvc:podDueDate>
-                <qsvc:podPurCost>{$defaults['purchase_cost']}</qsvc:podPurCost>
+                <qsvc:podPurCost>{$purCost}</qsvc:podPurCost>
                 <qsvc:podDiscPct>0.00</qsvc:podDiscPct>
                 <qsvc:podLoc>{$defaults['location']}</qsvc:podLoc>
                 <qsvc:podPerDate>{$dueDate}</qsvc:podPerDate>
@@ -85,7 +88,7 @@ class QadPurchaseOrderService
 
         $session = $this->client->sessionContextXml();
         $vendor = $this->esc($po->supplierRm->code);
-        $remarks = $this->esc("Matex {$po->po_number}");
+        $remarks = $this->esc(QadRemarks::compose($po->po_number, $purchasingRemarks));
 
         $body = <<<XML
             <qsvc:maintainPurchaseOrder>

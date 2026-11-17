@@ -5,6 +5,14 @@ import SearchableSelect from '@/Components/SearchableSelect';
 import TextInput from '@/Components/TextInput';
 import AdminLayout from '@/Layouts/AdminLayout';
 import { Head, Link, useForm } from '@inertiajs/react';
+import { useState } from 'react';
+
+const autofillGuard = {
+    'data-lpignore': 'true',
+    'data-1p-ignore': 'true',
+    'data-bwignore': 'true',
+    'data-form-type': 'other',
+};
 
 const SUPPLIER_ROLE_CATEGORY = {
     supplier_rm: 'raw_mat',
@@ -21,7 +29,22 @@ export default function Form({ user, prefill, qadSuppliers, roles }) {
         password_confirmation: '',
         role: user?.role || prefill?.role || roles[0]?.value || 'purchasing',
         supplier_code: user?.company?.code || prefill?.supplier_code || '',
+        broadcast_emails: user?.broadcast_emails || [],
     });
+    const [broadcastInput, setBroadcastInput] = useState('');
+    const [unlockAutofill, setUnlockAutofill] = useState(false);
+
+    const addBroadcastEmail = () => {
+        const emails = broadcastInput
+            .split(/[,;\s]+/)
+            .map((email) => email.trim().toLowerCase())
+            .filter(Boolean);
+        if (!emails.length) {
+            return;
+        }
+        setData('broadcast_emails', [...new Set([...(data.broadcast_emails || []), ...emails])]);
+        setBroadcastInput('');
+    };
 
     const supplierCategory = SUPPLIER_ROLE_CATEGORY[data.role];
     const supplierOptions = supplierCategory
@@ -46,13 +69,19 @@ export default function Form({ user, prefill, qadSuppliers, roles }) {
 
             <form
                 onSubmit={submit}
-                className="max-w-2xl space-y-4 ui-panel p-5 sm:p-6"
+                autoComplete="off"
+                className="relative max-w-2xl space-y-4 ui-panel p-5 sm:p-6"
             >
+                <div aria-hidden="true" className="sr-only">
+                    <input type="text" name="username" autoComplete="username" tabIndex={-1} />
+                    <input type="password" name="current-password" autoComplete="current-password" tabIndex={-1} />
+                </div>
                 <div className="grid gap-4 sm:grid-cols-2">
                     <div>
                         <InputLabel value="Name" />
                         <TextInput
                             className="mt-1 w-full"
+                            autoComplete="off"
                             value={data.name}
                             onChange={(e) => setData('name', e.target.value)}
                         />
@@ -62,9 +91,14 @@ export default function Form({ user, prefill, qadSuppliers, roles }) {
                         <InputLabel value="Email" />
                         <TextInput
                             type="email"
-                            className="mt-1 w-full"
+                            name="user_email"
+                            autoComplete={editing ? 'email' : 'off'}
+                            readOnly={!editing && !unlockAutofill}
+                            onFocus={() => setUnlockAutofill(true)}
+                            className="mt-1 w-full read-only:bg-surface"
                             value={data.email}
                             onChange={(e) => setData('email', e.target.value)}
+                            {...autofillGuard}
                         />
                         <InputError message={errors.email} className="mt-1" />
                     </div>
@@ -104,9 +138,14 @@ export default function Form({ user, prefill, qadSuppliers, roles }) {
                         />
                         <TextInput
                             type="password"
-                            className="mt-1 w-full"
+                            name="new_password"
+                            autoComplete="new-password"
+                            readOnly={!unlockAutofill}
+                            onFocus={() => setUnlockAutofill(true)}
+                            className="mt-1 w-full read-only:bg-surface"
                             value={data.password}
                             onChange={(e) => setData('password', e.target.value)}
+                            {...autofillGuard}
                         />
                         <InputError message={errors.password} className="mt-1" />
                     </div>
@@ -114,11 +153,16 @@ export default function Form({ user, prefill, qadSuppliers, roles }) {
                         <InputLabel value="Konfirmasi Password" />
                         <TextInput
                             type="password"
-                            className="mt-1 w-full"
+                            name="new_password_confirmation"
+                            autoComplete="new-password"
+                            readOnly={!unlockAutofill}
+                            onFocus={() => setUnlockAutofill(true)}
+                            className="mt-1 w-full read-only:bg-surface"
                             value={data.password_confirmation}
                             onChange={(e) =>
                                 setData('password_confirmation', e.target.value)
                             }
+                            {...autofillGuard}
                         />
                     </div>
                 </div>
@@ -168,6 +212,58 @@ export default function Form({ user, prefill, qadSuppliers, roles }) {
                             )}
                         </div>
                     )}
+                </div>
+
+                <div>
+                    <InputLabel value="Email broadcast (opsional)" />
+                    <p className="mt-0.5 text-xs text-ink-muted">
+                        Tembusan notifikasi. Login tetap memakai email utama.
+                    </p>
+                    <div className="mt-2 flex gap-2">
+                        <TextInput
+                            type="email"
+                            autoComplete="off"
+                            className="w-full"
+                            placeholder="ketik email, koma, lalu Tambah"
+                            value={broadcastInput}
+                            onChange={(e) => setBroadcastInput(e.target.value)}
+                            onKeyDown={(e) => {
+                                if (e.key === 'Enter' || e.key === ',') {
+                                    e.preventDefault();
+                                    addBroadcastEmail();
+                                }
+                            }}
+                        />
+                        <button
+                            type="button"
+                            className="rounded-md border border-line px-3 py-2 text-sm"
+                            onClick={addBroadcastEmail}
+                        >
+                            Tambah
+                        </button>
+                    </div>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                        {(data.broadcast_emails || []).map((email) => (
+                            <span
+                                key={email}
+                                className="inline-flex items-center gap-1 rounded-full bg-brand-muted px-2 py-0.5 text-xs text-brand-deep"
+                            >
+                                {email}
+                                <button
+                                    type="button"
+                                    onClick={() =>
+                                        setData(
+                                            'broadcast_emails',
+                                            data.broadcast_emails.filter((item) => item !== email),
+                                        )
+                                    }
+                                >
+                                    ×
+                                </button>
+                            </span>
+                        ))}
+                    </div>
+                    <InputError message={errors.broadcast_emails} className="mt-1" />
                 </div>
 
                 <div className="flex justify-end gap-3 pt-2">

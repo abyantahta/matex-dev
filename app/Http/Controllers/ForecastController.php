@@ -7,6 +7,7 @@ use App\Http\Requests\StoreForecastRequest;
 use App\Models\Company;
 use App\Models\Forecast;
 use App\Models\Item;
+use App\Support\StoresPublicUploads;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -18,6 +19,8 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class ForecastController extends Controller
 {
+    use StoresPublicUploads;
+
     public function index(Request $request): Response
     {
         $this->authorize('viewAny', Forecast::class);
@@ -191,7 +194,13 @@ class ForecastController extends Controller
                 if ($filePath) {
                     Storage::disk('public')->delete($filePath);
                 }
-                $filePath = $request->file('file')->store('forecasts', 'public');
+                try {
+                    $filePath = $this->storePublicUpload($request->file('file'), 'forecasts');
+                } catch (\RuntimeException $e) {
+                    throw \Illuminate\Validation\ValidationException::withMessages([
+                        'file' => 'File gagal diunggah ke storage server.',
+                    ]);
+                }
                 $original = $request->file('file')->getClientOriginalName();
             }
 

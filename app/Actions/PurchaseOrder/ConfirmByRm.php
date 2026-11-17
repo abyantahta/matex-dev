@@ -60,6 +60,9 @@ class ConfirmByRm
             $po->update([
                 'status' => PoStatus::AwaitingPurchasingOk,
                 'rm_confirmed_at' => now(),
+                'rm_price_notes' => filled($data['rm_price_notes'] ?? null)
+                    ? trim((string) $data['rm_price_notes'])
+                    : null,
             ]);
 
             $this->logStatus(

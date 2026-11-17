@@ -1,61 +1,25 @@
 import InputError from '@/Components/InputError';
 import InputLabel from '@/Components/InputLabel';
 import PrimaryButton from '@/Components/PrimaryButton';
-import SearchableSelect from '@/Components/SearchableSelect';
 import TextInput from '@/Components/TextInput';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
-import { formatQty, isQtyInput, toNum } from '@/utils/qty';
 import { encodeUploadField, formatFileSize } from '@/utils/upload';
 import { Head, Link, useForm } from '@inertiajs/react';
 import { useState } from 'react';
 
 const FILE_MAX_MB = 10;
 
-function emptyLine() {
-    return { item_id: '', qty: '' };
-}
-
-export default function Form({
-    forecast,
-    defaultPeriod,
-    defaultSupplierId,
-    suppliersRm,
-    items,
-}) {
+export default function Form({ forecast, defaultPeriod, defaultSupplierId, suppliersRm }) {
     const editing = Boolean(forecast);
-    const { data, setData, post, processing, errors, transform, setError, clearErrors } = useForm({
+    const { data, setData, post, processing, errors, setError, clearErrors } = useForm({
         supplier_rm_id: String(forecast?.supplier_rm_id || defaultSupplierId || ''),
         period_month: forecast?.period_month
             ? String(forecast.period_month).slice(0, 7)
             : defaultPeriod || '',
         notes: forecast?.notes || '',
-        // File dikirim sebagai base64 (lihat utils/upload.js) agar tidak diblokir WAF.
         file_base64: null,
         file_name: null,
-        items:
-            forecast?.items?.length > 0
-                ? forecast.items.map((line) => ({
-                      item_id: String(line.item_id || ''),
-                      qty: String(line.qty ?? ''),
-                  }))
-                : [emptyLine()],
     });
-
-    transform((form) => ({
-        ...form,
-        items: (form.items || [])
-            .filter((line) => line.item_id && toNum(line.qty) > 0)
-            .map((line) => ({
-                item_id: line.item_id,
-                qty: toNum(line.qty),
-            })),
-    }));
-
-    const updateLine = (index, key, value) => {
-        const next = [...data.items];
-        next[index] = { ...next[index], [key]: value };
-        setData('items', next);
-    };
 
     const [fileEncoding, setFileEncoding] = useState(false);
     const pickFile = async (file) => {
@@ -92,6 +56,8 @@ export default function Form({
         }
     };
 
+    const canSubmit = Boolean(data.file_base64) || Boolean(forecast?.file_path);
+
     return (
         <AuthenticatedLayout
             header={
@@ -101,8 +67,7 @@ export default function Form({
                         {editing ? 'Perbarui Forecast' : 'Upload Forecast'}
                     </h2>
                     <p className="mt-1 text-sm text-ink-muted">
-                        Forecast per supplier RM, berlaku untuk satu bulan. Upload ulang pada
-                        supplier & periode yang sama akan menggantikan data sebelumnya.
+                        Upload file PDF atau Excel saja. Tidak perlu menambah item number.
                     </p>
                 </div>
             }
@@ -112,7 +77,6 @@ export default function Form({
             <div className="ui-page">
                 <form onSubmit={submit} className="space-y-4">
                     <section className="ui-panel p-5 sm:p-6">
-                        <h3 className="mb-4 font-display font-semibold text-ink">Header</h3>
                         <div className="grid gap-4 md:grid-cols-2">
                             <div>
                                 <InputLabel value="Supplier Raw Material" />
@@ -151,15 +115,15 @@ export default function Form({
                                 <InputError message={errors.notes} className="mt-1" />
                             </div>
                             <div className="md:col-span-2">
-                                <InputLabel value="File forecast (opsional)" />
+                                <InputLabel value="File forecast (PDF / Excel)" />
                                 <input
                                     type="file"
                                     className="mt-1 block w-full text-sm"
-                                    accept=".pdf,.xlsx,.xls,.csv,.jpg,.jpeg,.png"
+                                    accept=".pdf,.xlsx,.xls,.csv"
                                     onChange={(e) => pickFile(e.target.files?.[0] || null)}
                                 />
                                 <p className="mt-1 text-xs text-ink-muted">
-                                    PDF, Excel, CSV, JPG, atau PNG — maks. {FILE_MAX_MB} MB
+                                    PDF atau Excel — maks. {FILE_MAX_MB} MB
                                     {fileEncoding && ' · Membaca file…'}
                                 </p>
                                 {forecast?.original_filename && !data.file_base64 && (
@@ -172,91 +136,6 @@ export default function Form({
                         </div>
                     </section>
 
-                    <section className="ui-panel p-5 sm:p-6">
-                        <h3 className="font-display font-semibold text-ink">Item Forecast</h3>
-                        <p className="mb-4 mt-1 text-sm text-ink-muted">
-                            Isi item number dan qty (kg, bilangan bulat). Boleh dikosongkan jika
-                            hanya mengunggah file.
-                        </p>
-                        <div className="space-y-3">
-                            {data.items.map((line, index) => (
-                                <div
-                                    key={index}
-                                    className="grid gap-3 rounded-lg border border-line bg-canvas-soft p-4 md:grid-cols-[1fr_160px_auto]"
-                                >
-                                    <div>
-                                        <InputLabel value="Item Number" />
-                                        <SearchableSelect
-                                            options={items}
-                                            value={line.item_id}
-                                            placeholder="Ketik item number..."
-                                            getOptionValue={(item) => String(item.id)}
-                                            getOptionLabel={(item) =>
-                                                `${item.item_number} — ${item.description}`
-                                            }
-                                            onChange={(val) => updateLine(index, 'item_id', val)}
-                                        />
-                                        <InputError
-                                            message={errors[`items.${index}.item_id`]}
-                                            className="mt-1"
-                                        />
-                                    </div>
-                                    <div>
-                                        <InputLabel value="Qty (kg)" />
-                                        <TextInput
-                                            type="text"
-                                            inputMode="numeric"
-                                            className="mt-1 w-full"
-                                            value={line.qty}
-                                            onChange={(e) => {
-                                                if (isQtyInput(e.target.value)) {
-                                                    updateLine(index, 'qty', e.target.value);
-                                                }
-                                            }}
-                                        />
-                                        <InputError
-                                            message={errors[`items.${index}.qty`]}
-                                            className="mt-1"
-                                        />
-                                    </div>
-                                    <div className="flex items-end">
-                                        {data.items.length > 1 && (
-                                            <button
-                                                type="button"
-                                                className="pb-2 text-sm text-rose-600"
-                                                onClick={() =>
-                                                    setData(
-                                                        'items',
-                                                        data.items.filter((_, i) => i !== index),
-                                                    )
-                                                }
-                                            >
-                                                Hapus
-                                            </button>
-                                        )}
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                        <button
-                            type="button"
-                            className="pressable mt-4 text-sm font-semibold text-brand hover:text-brand-deep"
-                            onClick={() => setData('items', [...data.items, emptyLine()])}
-                        >
-                            + Tambah item
-                        </button>
-                        <InputError message={errors.items} className="mt-2" />
-                        <p className="mt-3 text-xs text-ink-muted">
-                            Total qty:{' '}
-                            <span className="font-semibold text-ink">
-                                {formatQty(
-                                    data.items.reduce((sum, line) => sum + toNum(line.qty), 0),
-                                )}{' '}
-                                kg
-                            </span>
-                        </p>
-                    </section>
-
                     <div className="flex justify-end gap-3">
                         <Link
                             href={route('forecasts.index')}
@@ -264,7 +143,7 @@ export default function Form({
                         >
                             Batal
                         </Link>
-                        <PrimaryButton disabled={processing || fileEncoding}>
+                        <PrimaryButton disabled={processing || fileEncoding || !canSubmit}>
                             {processing
                                 ? 'Menyimpan…'
                                 : editing

@@ -12,6 +12,7 @@ use App\Actions\PurchaseOrder\UploadSignedPo;
 use App\Enums\CompanyType;
 use App\Enums\ScheduleStatus;
 use App\Enums\UserRole;
+use App\Http\Requests\ApprovePurchaseOrderRequest;
 use App\Http\Requests\ConfirmByRmRequest;
 use App\Http\Requests\RejectPurchaseOrderRequest;
 use App\Http\Requests\StorePurchaseOrderRequest;
@@ -39,7 +40,7 @@ class PurchaseOrderController extends Controller
         $orders = PurchaseOrder::query()
             ->visibleTo($user)
             ->withFulfillmentCounts()
-            ->with(['supplierRm', 'creator'])
+            ->with(['supplierRm', 'creator', 'deliveryNotes.receivings'])
             ->withSchedulesVisibleTo($user)
             ->when($request->string('status')->isNotEmpty(), fn ($q) => $q->where('status', $request->string('status')))
             ->latest()
@@ -117,6 +118,11 @@ class PurchaseOrderController extends Controller
                 'status',
                 ScheduleStatus::sentAndApprovedValues()
             ),
+            'schedules as unreceived_schedules_count' => fn ($q) => $q->where(
+                'status',
+                '!=',
+                ScheduleStatus::Received->value
+            ),
         ]);
         $purchaseOrder->append(['is_closed', 'has_signed_po']);
         $purchaseOrder->restrictRelationsFor($user);
@@ -156,7 +162,7 @@ class PurchaseOrderController extends Controller
     private function qadItemOptions()
     {
         return QadItem::active()
-            ->where('prod_line', 'RM')
+            ->rawMaterial()
             ->orderBy('description')
             ->get(['id', 'qad_code', 'description', 'uom', 'prod_line']);
     }
@@ -197,9 +203,12 @@ class PurchaseOrderController extends Controller
     {
         return Item::query()
             ->with('subcontOhp:id,code')
-            ->get(['id', 'item_number', 'subcont_ohp_id'])
+            ->get(['id', 'item_number', 'price', 'subcont_ohp_id'])
             ->keyBy('item_number')
-            ->map(fn (Item $item) => ['subcont_ohp_code' => $item->subcontOhp?->code]);
+            ->map(fn (Item $item) => [
+                'subcont_ohp_code' => $item->subcontOhp?->code,
+                'price' => $item->price,
+            ]);
     }
 
     public function update(
@@ -233,11 +242,11 @@ class PurchaseOrderController extends Controller
     }
 
     public function approve(
+        ApprovePurchaseOrderRequest $request,
         PurchaseOrder $purchaseOrder,
         ApproveByPurchasing $action,
     ): RedirectResponse {
-        $this->authorize('approveAsPurchasing', $purchaseOrder);
-        $po = $action->execute($purchaseOrder, request()->user());
+        $po = $action->execute($purchaseOrder, $request->user(), $request->validated());
 
         $message = 'PO dikonfirmasi OK. Delivery Notes telah digenerate.';
         if ($po->qad_po_number) {

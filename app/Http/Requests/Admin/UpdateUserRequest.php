@@ -59,7 +59,28 @@ class UpdateUserRequest extends FormRequest
             'password' => ['nullable', 'confirmed', Password::defaults()],
             'role' => ['required', Rule::in($allowedRoles)],
             'supplier_code' => ['nullable', 'string'],
+            'broadcast_emails' => ['nullable', 'array'],
+            'broadcast_emails.*' => ['email', 'max:255'],
         ];
+    }
+
+    protected function prepareForValidation(): void
+    {
+        $this->merge([
+            'broadcast_emails' => $this->normalizeBroadcastEmails($this->input('broadcast_emails')),
+        ]);
+    }
+
+    private function normalizeBroadcastEmails(mixed $value): array
+    {
+        $list = is_array($value) ? $value : preg_split('/[,;\n]+/', (string) $value);
+
+        return collect($list)
+            ->map(fn ($email) => strtolower(trim((string) $email)))
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
     }
 
     public function withValidator(Validator $validator): void

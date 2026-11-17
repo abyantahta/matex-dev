@@ -64,8 +64,9 @@ class QadItemService
             }
 
             $code = $this->soap->sanitizeValue($row['t_pt_part'] ?? null);
+            $prodLine = $this->soap->sanitizeValue($row['t_pt_prod_line'] ?? null);
 
-            if (blank($code)) {
+            if (blank($code) || strcasecmp((string) $prodLine, 'RM') !== 0) {
                 continue;
             }
 
@@ -75,7 +76,7 @@ class QadItemService
                 'uom' => $this->soap->sanitizeValue($row['t_pt_um'] ?? null),
                 'part_number' => $this->soap->sanitizeValue($row['t_pt_desc2'] ?? null),
                 'qad_group' => $this->soap->sanitizeValue($row['t_pt_group'] ?? null),
-                'prod_line' => $this->soap->sanitizeValue($row['t_pt_prod_line'] ?? null),
+                'prod_line' => $prodLine,
                 'qad_status' => $this->soap->sanitizeValue($row['t_pt_status'] ?? null),
                 'location' => $this->soap->sanitizeValue($row['t_pt_location'] ?? null),
                 'is_active' => true,

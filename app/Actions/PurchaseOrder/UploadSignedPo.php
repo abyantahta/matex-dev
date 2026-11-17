@@ -4,11 +4,14 @@ namespace App\Actions\PurchaseOrder;
 
 use App\Models\PurchaseOrder;
 use App\Models\User;
+use App\Support\StoresPublicUploads;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 
 class UploadSignedPo
 {
+    use StoresPublicUploads;
+
     /**
      * Stores the signed PO PDF, replacing any previous upload — Purchasing
      * can re-upload at any time (e.g. wrong file, needs a rescan) with no
@@ -20,7 +23,13 @@ class UploadSignedPo
             Storage::disk('public')->delete($po->signed_po_path);
         }
 
-        $path = $file->store('signed-pos', 'public');
+        try {
+            $path = $this->storePublicUpload($file, 'signed-pos');
+        } catch (\RuntimeException $e) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'signed_po' => 'File gagal diunggah ke storage server.',
+            ]);
+        }
 
         $po->update([
             'signed_po_path' => $path,

@@ -24,6 +24,7 @@ class StorePurchaseOrderRequest extends FormRequest
             'items' => ['required', 'array', 'min:1'],
             'items.*.item_number' => ['required', 'string', 'exists:qad_items,qad_code', 'distinct'],
             'items.*.qty_ordered' => ['required', 'integer', 'gt:0'],
+            'items.*.unit_price' => ['nullable', 'numeric', 'min:0'],
             'items.*.schedules' => ['required', 'array', 'min:1'],
             'items.*.schedules.*.scheduled_date' => ['required', 'date'],
             'items.*.schedules.*.qty' => ['required', 'integer', 'gt:0'],

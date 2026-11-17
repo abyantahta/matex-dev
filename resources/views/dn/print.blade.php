@@ -74,7 +74,7 @@
             gap: 24px;
         }
         .sign {
-            width: 30%;
+            width: 42%;
             text-align: center;
             font-size: 12px;
         }
@@ -185,10 +185,6 @@
         </div>
 
         <div class="footer">
-            <div class="sign">
-                <div>Dibuat oleh</div>
-                <div class="line">Purchasing SDI</div>
-            </div>
             <div class="sign">
                 <div>Dikirim oleh</div>
                 <div class="line">Supplier RM</div>

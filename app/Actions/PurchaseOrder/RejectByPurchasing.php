@@ -3,14 +3,17 @@
 namespace App\Actions\PurchaseOrder;
 
 use App\Actions\Concerns\LogsPoStatus;
+use App\Actions\Concerns\NotifiesSupplierRm;
 use App\Enums\PoStatus;
 use App\Models\PurchaseOrder;
 use App\Models\User;
+use App\Notifications\PurchaseOrderRejectedNotification;
 use Illuminate\Validation\ValidationException;
 
 class RejectByPurchasing
 {
     use LogsPoStatus;
+    use NotifiesSupplierRm;
 
     public function execute(PurchaseOrder $po, User $user, string $reason): PurchaseOrder
     {
@@ -40,6 +43,9 @@ class RejectByPurchasing
             $reason
         );
 
-        return $po->fresh();
+        $po = $po->fresh(['items.item', 'supplierRm']);
+        $this->notifySupplierRm($po, new PurchaseOrderRejectedNotification($po, $user, $reason));
+
+        return $po;
     }
 }
