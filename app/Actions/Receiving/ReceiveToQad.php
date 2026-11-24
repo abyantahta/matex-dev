@@ -11,7 +11,9 @@ use App\Models\Receiving;
 use App\Models\User;
 use App\Services\Qad\QadClientInterface;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
+use Throwable;
 
 class ReceiveToQad
 {
@@ -97,7 +99,20 @@ class ReceiveToQad
                 'notes' => $notes ?? $receiving->notes,
             ])->save();
 
-            $result = $this->qad->receive($receiving);
+            try {
+                $result = $this->qad->receive($receiving);
+            } catch (Throwable $e) {
+                Log::error('QAD receivePurchaseOrder failed', [
+                    'receiving_id' => $receiving->id,
+                    'dn_id' => $dn->id,
+                    'exception' => $e,
+                ]);
+                $result = [
+                    'success' => false,
+                    'payload' => [],
+                    'response' => ['error' => $e->getMessage()],
+                ];
+            }
 
             $receiving->update([
                 'qad_status' => $result['success'] ? QadSyncStatus::Success : QadSyncStatus::Failed,

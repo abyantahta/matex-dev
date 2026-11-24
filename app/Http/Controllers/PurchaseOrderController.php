@@ -124,7 +124,7 @@ class PurchaseOrderController extends Controller
                 ScheduleStatus::Received->value
             ),
         ]);
-        $purchaseOrder->append(['is_closed', 'has_signed_po']);
+        $purchaseOrder->append(['is_closed', 'has_signed_po', 'qad_error_message']);
         $purchaseOrder->restrictRelationsFor($user);
 
         // OHP tidak melihat history internal SDI ↔ Supplier RM
@@ -248,11 +248,9 @@ class PurchaseOrderController extends Controller
     ): RedirectResponse {
         $po = $action->execute($purchaseOrder, $request->user(), $request->validated());
 
-        $message = 'PO dikonfirmasi OK. Delivery Notes telah digenerate.';
+        $message = 'PO dikonfirmasi OK.';
         if ($po->qad_po_number) {
             $message .= " Tersinkron ke QAD sebagai {$po->qad_po_number}.";
-        } elseif ($po->qad_status?->value === 'failed') {
-            $message .= ' Sync ke QAD gagal — cek riwayat PO.';
         }
 
         return back()->with('success', $message);

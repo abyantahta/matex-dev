@@ -18,6 +18,7 @@ class QadReceivingClient implements QadClientInterface
         $receiving->loadMissing([
             'deliveryNote.purchaseOrder',
             'deliveryNote.purchaseOrderItem.item',
+            'deliveryNote.deliverySchedule',
         ]);
 
         $dn = $receiving->deliveryNote;
@@ -46,6 +47,8 @@ class QadReceivingClient implements QadClientInterface
                 'line' => $poItem->qad_line_number,
                 'qty' => (float) $receiving->received_qty,
             ]],
+            $dn->dn_number,
+            $dn->qadReceiptDate()->toDateString(),
         );
     }
 }

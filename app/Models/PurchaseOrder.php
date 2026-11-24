@@ -6,7 +6,9 @@ use App\Enums\PoStatus;
 use App\Enums\QadSyncStatus;
 use App\Enums\ScheduleStatus;
 use App\Enums\UserRole;
+use App\Support\QadSoap;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -170,6 +172,20 @@ class PurchaseOrder extends Model
     public function isIssuedInQad(): bool
     {
         return filled($this->qad_po_number) || $this->qad_status === QadSyncStatus::Success;
+    }
+
+    protected function qadErrorMessage(): Attribute
+    {
+        return Attribute::get(function (): ?string {
+            if ($this->qad_status !== QadSyncStatus::Failed) {
+                return null;
+            }
+
+            return QadSoap::userMessage([
+                'success' => false,
+                'response' => $this->qad_response ?? [],
+            ]);
+        });
     }
 
     public function restrictRelationsFor(User $user): static

@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Support\Carbon;
 
 class DeliveryNote extends Model
 {
@@ -98,6 +99,29 @@ class DeliveryNote extends Model
     public function getRemainingQtyAttribute(): int
     {
         return max(0, (int) $this->qty - $this->received_qty);
+    }
+
+    /**
+     * Tanggal yang di-push ke QAD (effDate): tanggal surat jalan pada DN
+     * terakhir sebelum konfirmasi keberangkatan — bukan waktu receiving
+     * atau konfirmasi OHP.
+     */
+    public function qadReceiptDate(): Carbon
+    {
+        if ($this->delivery_date) {
+            return $this->delivery_date->copy()->startOfDay();
+        }
+
+        $scheduled = $this->deliverySchedule?->scheduled_date;
+        if ($scheduled) {
+            return Carbon::parse($scheduled)->startOfDay();
+        }
+
+        if (preg_match('/^DN(\d{6})/', (string) $this->dn_number, $m)) {
+            return Carbon::createFromFormat('ymd', $m[1])->startOfDay();
+        }
+
+        return now()->startOfDay();
     }
 
     public function getIsFullyReceivedAttribute(): bool

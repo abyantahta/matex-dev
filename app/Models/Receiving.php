@@ -68,7 +68,7 @@ class Receiving extends Model
             }
 
             if (preg_match('/Period has been closed for entity\s*([\w-]+)/i', $raw, $m)) {
-                return "Periode akuntansi QAD untuk tanggal hari ini (entity {$m[1]}) belum dibuka atau sudah ditutup. "
+                return "Periode akuntansi QAD untuk tanggal surat jalan (entity {$m[1]}) belum dibuka atau sudah ditutup. "
                     .'Minta tim Finance/QAD membuka periode tersebut, lalu klik "Kirim ulang ke QAD".';
             }
 

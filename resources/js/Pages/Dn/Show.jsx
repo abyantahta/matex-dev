@@ -347,7 +347,12 @@ export default function Show({ note, sjUrl, receivingEnabled, qtyCap }) {
                         <section className="rounded-xl border border-emerald-200 bg-emerald-50 p-5">
                             <h3 className="font-semibold text-emerald-900">Receiving PPIC</h3>
                             <p className="mt-1 text-sm text-emerald-800">
-                                Proses receiving akan langsung di-push ke QAD.
+                                Proses receiving akan langsung di-push ke QAD. Packing
+                                slip = nomor DN, tanggal posting = tanggal surat jalan
+                                {currentDeliveryDate
+                                    ? ` (${new Date(currentDeliveryDate).toLocaleDateString('id-ID')})`
+                                    : ''}
+                                — bukan tanggal klik receive.
                             </p>
                             {note.received_qty > 0 && (
                                 <p className="mt-2 text-sm font-medium text-emerald-900">

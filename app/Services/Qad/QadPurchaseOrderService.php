@@ -4,6 +4,7 @@ namespace App\Services\Qad;
 
 use App\Models\PurchaseOrder;
 use App\Support\QadRemarks;
+use App\Support\QadSoap;
 
 class QadPurchaseOrderService
 {
@@ -125,21 +126,31 @@ class QadPurchaseOrderService
             XML;
 
         $result = $this->client->call('maintainPurchaseOrder', 'urn:services-qad-com:SDI_BuatPO', $body);
-        $qadPoNumber = $this->extractPoNumber($result['response'] ?? '');
-        $qadResult = $this->extractResult($result['response'] ?? '');
+        $bodyXml = $result['response'] ?? '';
+        $qadPoNumber = $this->extractPoNumber($bodyXml);
+        $qadResult = QadSoap::result($bodyXml);
+        $warnings = QadSoap::warnings($bodyXml);
+        $isFault = QadSoap::isFault($bodyXml);
+        $success = $result['successful'] && ! $isFault && $qadResult !== 'error' && $qadPoNumber !== null;
 
         return [
-            'success' => $result['successful'] && $qadResult !== 'error' && $qadPoNumber !== null,
+            'success' => $success,
             'payload' => ['lines' => $payloadLines],
             'response' => [
                 'result' => $qadResult,
                 'po_number' => $qadPoNumber,
-                'raw' => $result['response'] ?? null,
+                'warnings' => $warnings,
+                'error' => $success ? null : ($warnings ?: QadSoap::faultString($bodyXml) ?: (
+                    $result['successful'] ? null : 'QAD tidak merespons (HTTP '.$result['status'].').'
+                )),
+                'raw' => $bodyXml,
             ],
-            'qad_po_number' => $qadPoNumber,
+            'qad_po_number' => $success ? $qadPoNumber : null,
             // purchase_order_item_id => QAD line number, so Receiving can
             // later tell QAD which line a receipt applies to.
-            'line_numbers' => collect($payloadLines)->pluck('line', 'purchase_order_item_id')->all(),
+            'line_numbers' => $success
+                ? collect($payloadLines)->pluck('line', 'purchase_order_item_id')->all()
+                : [],
         ];
     }
 
@@ -147,15 +158,6 @@ class QadPurchaseOrderService
     {
         if (preg_match('/<(?:\w+:)?poNbr>([^<]+)<\/(?:\w+:)?poNbr>/i', $body, $m)) {
             return trim($m[1]);
-        }
-
-        return null;
-    }
-
-    private function extractResult(string $body): ?string
-    {
-        if (preg_match('/<(?:\w+:)?result>([^<]+)<\/(?:\w+:)?result>/i', $body, $m)) {
-            return strtolower(trim($m[1]));
         }
 
         return null;

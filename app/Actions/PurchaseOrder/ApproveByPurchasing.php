@@ -11,6 +11,7 @@ use App\Models\User;
 use App\Notifications\PurchaseOrderApprovedNotification;
 use App\Services\Qad\QadPurchaseOrderService;
 use App\Support\QadRemarks;
+use App\Support\QadSoap;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
@@ -31,19 +32,20 @@ class ApproveByPurchasing
             ]);
         }
 
-        $po = DB::transaction(function () use ($po, $user, $data) {
-            foreach ($data['items'] ?? [] as $row) {
-                if (! isset($row['id'])) {
-                    continue;
-                }
-
-                $po->items()->whereKey($row['id'])->update([
-                    'unit_price' => $row['unit_price'] ?? null,
-                ]);
+        foreach ($data['items'] ?? [] as $row) {
+            if (! isset($row['id'])) {
+                continue;
             }
-            // Tanggal rencana yang dikosongkan RM (qty_confirmed 0) hanya
-            // dipertahankan untuk review Purchasing. Setelah OK, buang agar
-            // tidak muncul sebagai jadwal/DN yang harus dikirim.
+
+            $po->items()->whereKey($row['id'])->update([
+                'unit_price' => $row['unit_price'] ?? null,
+            ]);
+        }
+
+        $po->load(['items.item', 'supplierRm']);
+        $result = $this->pushToQad($po, $data['qad_remarks'] ?? null);
+
+        $po = DB::transaction(function () use ($po, $user, $data, $result) {
             $po->schedules()
                 ->whereNull('ship_confirmed_at')
                 ->whereDoesntHave('deliveryNote')
@@ -53,22 +55,26 @@ class ApproveByPurchasing
             $composedRemarks = QadRemarks::compose($po->po_number, $data['qad_remarks'] ?? null);
 
             $from = $po->status;
-            $po->update([
+            $payload = [
                 'status' => PoStatus::Confirmed,
                 'purchasing_approved_at' => now(),
                 'rejection_reason' => null,
                 'qad_remarks' => $composedRemarks,
-            ]);
+                'qad_status' => QadSyncStatus::Success,
+                'qad_po_number' => $result['qad_po_number'],
+                'qad_payload' => $result['payload'],
+                'qad_response' => $result['response'],
+            ];
 
-            $this->pushToQad($po, $data['qad_remarks'] ?? null);
+            if ($result['qad_po_number']) {
+                $payload['po_number'] = $result['qad_po_number'];
+            }
 
-            $notes = 'Purchasing mengonfirmasi OK — menunggu Supplier RM isi no. SJ internal & generate DN';
-            $notes .= match ($po->qad_status) {
-                QadSyncStatus::Success => " · Tersinkron ke QAD sebagai {$po->qad_po_number}.",
-                QadSyncStatus::Failed => ' · Sync ke QAD gagal.',
-                default => '',
-            };
-            $notes .= " · Remarks QAD: {$composedRemarks}";
+            $po->update($payload);
+
+            foreach ($result['line_numbers'] ?? [] as $poItemId => $lineNumber) {
+                $po->items()->whereKey($poItemId)->update(['qad_line_number' => $lineNumber]);
+            }
 
             $this->logStatus(
                 $po,
@@ -76,63 +82,61 @@ class ApproveByPurchasing
                 PoStatus::Confirmed,
                 'purchasing_approved',
                 $user,
-                $notes,
-                $po->qad_status ? ['qad_status' => $po->qad_status->value, 'qad_po_number' => $po->qad_po_number] : null,
+                "Purchasing mengonfirmasi OK — tersinkron ke QAD sebagai {$po->qad_po_number}."
+                    ." · Remarks QAD: {$composedRemarks}",
+                ['qad_status' => QadSyncStatus::Success->value, 'qad_po_number' => $po->qad_po_number],
             );
 
             return $po->fresh(['items.item', 'schedules.deliveryNote', 'deliveryNotes']);
         });
 
-        // Outside the transaction — an external mail send has no business
-        // being inside a DB transaction, and this shouldn't roll back the
-        // approval or block on SMTP either way.
         $this->notifySupplierRm($po, new PurchaseOrderApprovedNotification($po));
 
         return $po;
     }
 
     /**
-     * Push the PO to QAD (maintainPurchaseOrder) once Purchasing has given
-     * final OK — this, not RM's confirmation, is the fix point the business
-     * treats as final, so this is the only place this fires. A QAD failure
-     * doesn't block the Purchasing approval itself, same as the Receiving →
-     * QAD stub flow.
+     * Push ke QAD dulu. Kalau QAD menolak / tidak merespons, PO tetap
+     * AwaitingPurchasingOk — tidak boleh tercatat Confirm OK di Matex.
+     *
+     * @return array{success: bool, payload: array, response: array, qad_po_number: ?string, line_numbers: array<int, int>}
      */
-    private function pushToQad(PurchaseOrder $po, ?string $remarks = null): void
+    private function pushToQad(PurchaseOrder $po, ?string $remarks = null): array
     {
         try {
             $result = $this->qad->createFromMatexPo($po, $remarks);
         } catch (Throwable $e) {
             Log::error('QAD maintainPurchaseOrder failed', ['po_id' => $po->id, 'exception' => $e]);
-
-            $po->update(['qad_status' => QadSyncStatus::Failed]);
-
-            return;
+            $this->abortBecauseQadFailed($po, [
+                'payload' => [],
+                'response' => ['error' => $e->getMessage()],
+            ], $e->getMessage());
         }
 
-        $payload = [
-            'qad_status' => $result['success'] ? QadSyncStatus::Success : QadSyncStatus::Failed,
-            'qad_po_number' => $result['qad_po_number'],
-            'qad_payload' => $result['payload'],
-            'qad_response' => $result['response'],
-        ];
-
-        // Replace the DR- draft placeholder with the real QAD PO number now
-        // that it's fixed — po_number is what shows everywhere in matex
-        // (DN numbers, search, etc), so this is what makes "still draft"
-        // vs "has a real PO number" visible at a glance.
-        if ($result['success'] && $result['qad_po_number']) {
-            $payload['po_number'] = $result['qad_po_number'];
+        if (! ($result['success'] ?? false)) {
+            $this->abortBecauseQadFailed($po, $result, QadSoap::userMessage($result));
         }
 
-        $po->update($payload);
+        return $result;
+    }
 
-        // Persist the QAD line number per item — Receiving needs it later
-        // to tell QAD which PO line a receipt applies to.
-        if ($result['success']) {
-            foreach ($result['line_numbers'] ?? [] as $poItemId => $lineNumber) {
-                $po->items()->whereKey($poItemId)->update(['qad_line_number' => $lineNumber]);
-            }
-        }
+    /**
+     * @param  array{payload?: array, response?: array}  $result
+     */
+    private function abortBecauseQadFailed(PurchaseOrder $po, array $result, string $detail): never
+    {
+        $po->update([
+            'qad_status' => QadSyncStatus::Failed,
+            'qad_payload' => $result['payload'] ?? null,
+            'qad_response' => $result['response'] ?? ['error' => $detail],
+        ]);
+
+        $message = 'QAD menolak pembuatan PO. Konfirmasi OK dibatalkan. '.$detail;
+
+        session()->flash('error', $message);
+
+        throw ValidationException::withMessages([
+            'qad' => $message,
+        ]);
     }
 }

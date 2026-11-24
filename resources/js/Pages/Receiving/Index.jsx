@@ -93,6 +93,12 @@ export default function Index({ ready, history, receivingEnabled }) {
                                                     RM: {note.purchase_order?.supplier_rm?.name} → OHP:{' '}
                                                     {note.delivery_schedule?.ohp_supplier?.name}
                                                 </p>
+                                                <p className="text-xs text-ink-faint">
+                                                    QAD packing slip: {note.dn_number}
+                                                    {note.delivery_date
+                                                        ? ` · tanggal SJ ${new Date(note.delivery_date).toLocaleDateString('id-ID')}`
+                                                        : ''}
+                                                </p>
                                                 {isPartialAlready && (
                                                     <p className="mt-1 text-xs font-medium text-amber-700">
                                                         Sudah diterima {formatQty(note.received_qty)} kg

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Admin\ImportItemPriceRequest;
 use App\Models\Item;
 use App\Models\QadItem;
 use App\Support\Money;
@@ -83,12 +84,8 @@ class ItemPriceController extends Controller
         return SpreadsheetBook::download('harga-rm.xls', ['item_number', 'description', 'harga'], $rows);
     }
 
-    public function import(Request $request): RedirectResponse
+    public function import(ImportItemPriceRequest $request): RedirectResponse
     {
-        $request->validate([
-            'file' => ['required', 'file', 'mimes:xls,xlsx,csv,xml,txt', 'max:10240'],
-        ]);
-
         $rows = SpreadsheetBook::read($request->file('file'));
         if ($rows->isEmpty()) {
             throw ValidationException::withMessages([

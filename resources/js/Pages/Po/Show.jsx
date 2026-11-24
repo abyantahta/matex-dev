@@ -442,7 +442,7 @@ function ScheduleMatrix({
 }
 
 export default function Show({ order, hideInternalHistory = false }) {
-    const { auth } = usePage().props;
+    const { auth, errors } = usePage().props;
     const role = auth.user.role;
     const [rejectReason, setRejectReason] = useState('');
     const [qadRemarks, setQadRemarks] = useState('');
@@ -1090,6 +1090,11 @@ export default function Show({ order, hideInternalHistory = false }) {
                                 <h3 className="font-semibold text-amber-900">
                                     Persetujuan Purchasing
                                 </h3>
+                                {(errors?.qad || order.qad_error_message) && (
+                                    <div className="mt-3 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-800">
+                                        {errors?.qad || order.qad_error_message}
+                                    </div>
+                                )}
                                 {order.rm_price_notes && (
                                     <div className="mt-3 rounded-md border border-amber-200 bg-surface px-3 py-2 text-sm">
                                         <p className="font-medium text-ink">Catatan harga dari RM</p>
@@ -1208,6 +1213,11 @@ export default function Show({ order, hideInternalHistory = false }) {
                                     }
                                     /40)
                                 </p>
+                                {(errors?.qad || order.qad_error_message) && (
+                                    <div className="mt-3 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-800">
+                                        {errors?.qad || order.qad_error_message}
+                                    </div>
+                                )}
                                 <div className="mt-4 flex justify-end gap-2">
                                     <button
                                         type="button"
@@ -1219,14 +1229,20 @@ export default function Show({ order, hideInternalHistory = false }) {
                                     <PrimaryButton
                                         className="bg-emerald-700"
                                         onClick={() => {
-                                            router.post(route('purchase-orders.approve', order.id), {
-                                                qad_remarks: qadRemarks,
-                                                items: (order.items || []).map((item) => ({
-                                                    id: item.id,
-                                                    unit_price: priceDrafts[item.id] || null,
-                                                })),
-                                            });
-                                            setShowRemarksModal(false);
+                                            router.post(
+                                                route('purchase-orders.approve', order.id),
+                                                {
+                                                    qad_remarks: qadRemarks,
+                                                    items: (order.items || []).map((item) => ({
+                                                        id: item.id,
+                                                        unit_price: priceDrafts[item.id] || null,
+                                                    })),
+                                                },
+                                                {
+                                                    preserveScroll: true,
+                                                    onSuccess: () => setShowRemarksModal(false),
+                                                },
+                                            );
                                         }}
                                     >
                                         Confirm OK

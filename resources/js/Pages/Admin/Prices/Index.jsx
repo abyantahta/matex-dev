@@ -4,8 +4,11 @@ import PrimaryButton from '@/Components/PrimaryButton';
 import TextInput from '@/Components/TextInput';
 import AdminLayout from '@/Layouts/AdminLayout';
 import { formatPrice, isPriceInput } from '@/utils/money';
+import { encodeUploadField, formatFileSize } from '@/utils/upload';
 import { Head, router, useForm } from '@inertiajs/react';
 import { useState } from 'react';
+
+const FILE_MAX_MB = 10;
 
 function PriceRow({ item }) {
     const { data, setData, patch, processing, errors } = useForm({
@@ -44,7 +47,33 @@ function PriceRow({ item }) {
 
 export default function Index({ items, filters }) {
     const [q, setQ] = useState(filters.q || '');
-    const importForm = useForm({ file: null });
+    const [fileEncoding, setFileEncoding] = useState(false);
+    const importForm = useForm({ file_base64: null, file_name: null });
+
+    const pickImportFile = async (file) => {
+        importForm.clearErrors('file');
+        if (!file) {
+            importForm.setData({ file_base64: null, file_name: null });
+            return;
+        }
+        if (file.size > FILE_MAX_MB * 1024 * 1024) {
+            importForm.setData({ file_base64: null, file_name: null });
+            importForm.setError(
+                'file',
+                `Ukuran file ${formatFileSize(file.size)} melebihi batas ${FILE_MAX_MB} MB.`,
+            );
+            return;
+        }
+        setFileEncoding(true);
+        try {
+            const encoded = await encodeUploadField('file', file);
+            importForm.setData(encoded);
+        } catch (err) {
+            importForm.setError('file', err?.message || 'Gagal membaca file.');
+        } finally {
+            setFileEncoding(false);
+        }
+    };
 
     return (
         <AdminLayout
@@ -81,19 +110,32 @@ export default function Index({ items, filters }) {
                     </form>
 
                     <form
-                        className="flex items-center gap-2"
+                        className="flex flex-wrap items-center gap-2"
                         onSubmit={(e) => {
                             e.preventDefault();
-                            importForm.post(route('admin.prices.import'), { forceFormData: true });
+                            importForm.post(route('admin.prices.import'), {
+                                preserveScroll: true,
+                            });
                         }}
                     >
                         <input
                             type="file"
                             accept=".xls,.xlsx,.csv,.xml"
-                            onChange={(e) => importForm.setData('file', e.target.files?.[0] || null)}
+                            onChange={(e) => pickImportFile(e.target.files?.[0] || null)}
                         />
-                        <PrimaryButton className="bg-ink" disabled={importForm.processing || !importForm.data.file}>
-                            Import
+                        <PrimaryButton
+                            className="bg-ink"
+                            disabled={
+                                importForm.processing ||
+                                fileEncoding ||
+                                !importForm.data.file_base64
+                            }
+                        >
+                            {fileEncoding
+                                ? 'Membaca file…'
+                                : importForm.processing
+                                  ? 'Mengimpor…'
+                                  : 'Import'}
                         </PrimaryButton>
                     </form>
                 </div>

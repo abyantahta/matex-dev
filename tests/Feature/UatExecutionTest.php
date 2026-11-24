@@ -374,20 +374,26 @@ class UatExecutionTest extends TestCase
     }
 
     // ---------------------------------------------------------------
-    // PO-17 — QAD failure does not block Purchasing approval.
+    // PO-17 — QAD failure blocks Purchasing approval (Matex must not
+    // show Confirm OK if QAD rejected / was unreachable).
     // ---------------------------------------------------------------
-    public function test_po_17_qad_failure_does_not_block_approval(): void
+    public function test_po_17_qad_failure_blocks_approval(): void
     {
         Config::set('qad.qxi.base_url', 'http://127.0.0.1:1/unreachable');
 
         $po = $this->makePo(PoStatus::AwaitingPurchasingOk);
         $purchasing = User::findOrFail(2);
 
-        $this->actingAs($purchasing)->post(route('purchase-orders.approve', $po))->assertRedirect();
+        $this->actingAs($purchasing)
+            ->from(route('purchase-orders.show', $po))
+            ->post(route('purchase-orders.approve', $po))
+            ->assertRedirect()
+            ->assertSessionHasErrors('qad');
 
         $po->refresh();
-        $this->assertSame(PoStatus::Confirmed, $po->status, 'Approval must still succeed even when QAD is unreachable.');
+        $this->assertSame(PoStatus::AwaitingPurchasingOk, $po->status, 'Approval must not succeed when QAD is unreachable.');
         $this->assertSame(QadSyncStatus::Failed, $po->qad_status);
+        $this->assertNull($po->purchasing_approved_at);
     }
 
     // ---------------------------------------------------------------

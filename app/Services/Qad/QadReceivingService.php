@@ -2,6 +2,8 @@
 
 namespace App\Services\Qad;
 
+use App\Support\QadSoap;
+
 class QadReceivingService
 {
     public function __construct(private readonly QadSoapClient $client) {}
@@ -36,13 +38,22 @@ class QadReceivingService
      * just sends that increment's qty; QAD reduces its own open qty
      * incrementally per call, same as matex's own remaining-qty tracking.
      *
+     * packingslip = nomor DN Matex. effDate = tanggal surat jalan (DN
+     * terakhir sebelum konfirmasi keberangkatan), bukan waktu PPIC klik
+     * receive — delay OHP/QAD tidak boleh menggeser tanggal posting.
+     *
      * @param  array<int, array{line: int, qty: float}>  $lines
      * @return array{success: bool, payload: array, response: array}
      */
-    public function receivePurchaseOrder(string $poNumber, array $lines): array
-    {
+    public function receivePurchaseOrder(
+        string $poNumber,
+        array $lines,
+        ?string $packingSlip = null,
+        ?string $effectiveDate = null,
+    ): array {
         $poEsc = $this->esc($poNumber);
-        $today = now()->format('Y-m-d');
+        $psEsc = $this->esc($packingSlip ?? '');
+        $effDate = $effectiveDate ?: now()->format('Y-m-d');
         $defaults = config('qad.defaults');
 
         $lineXml = '';
@@ -117,7 +128,8 @@ class QadReceivingService
             <dsPurchaseOrderReceive>
             <purchaseOrderReceive>
             <ordernum>{$poEsc}</ordernum>
-            <effDate>{$today}</effDate>
+            <packingslip>{$psEsc}</packingslip>
+            <effDate>{$effDate}</effDate>
             <fillAll>false</fillAll>
             <move>true</move>{$lineXml}
             <yn>true</yn>
@@ -132,49 +144,28 @@ class QadReceivingService
         $result = $this->client->sendRaw($envelope);
         $body = $result['response'] ?? '';
 
-        $qadResult = $this->extractResult($body);
-        $warnings = $this->extractWarnings($body);
-        $isFault = stripos($body, ':Fault') !== false;
+        $qadResult = QadSoap::result($body);
+        $warnings = QadSoap::warnings($body);
+        $isFault = QadSoap::isFault($body);
+        $success = $result['successful'] && ! $isFault && $qadResult !== 'error';
 
         return [
-            'success' => $result['successful'] && ! $isFault && $qadResult !== 'error',
-            'payload' => ['po_number' => $poNumber, 'lines' => $lines],
+            'success' => $success,
+            'payload' => [
+                'po_number' => $poNumber,
+                'packingslip' => $packingSlip,
+                'eff_date' => $effDate,
+                'lines' => $lines,
+            ],
             'response' => [
                 'result' => $qadResult,
                 'warnings' => $warnings,
+                'error' => $success ? null : ($warnings ?: QadSoap::faultString($body) ?: (
+                    $result['successful'] ? null : 'QAD tidak merespons (HTTP '.$result['status'].').'
+                )),
                 'raw' => $body,
             ],
         ];
-    }
-
-    private function extractResult(string $body): ?string
-    {
-        if (preg_match('/<(?:\w+:)?result>([^<]+)<\/(?:\w+:)?result>/i', $body, $m)) {
-            return strtolower(trim($m[1]));
-        }
-
-        return null;
-    }
-
-    /** Gabungkan tt_msg_desc + tt_msg_field (kalau ada) jadi satu string ringkas per pesan. */
-    private function extractWarnings(string $body): ?string
-    {
-        if (! preg_match_all('/<(?:\w+:)?tt_msg_desc>([^<]*)<\/(?:\w+:)?tt_msg_desc>/i', $body, $descMatches)) {
-            return null;
-        }
-        preg_match_all('/<(?:\w+:)?tt_msg_field>([^<]*)<\/(?:\w+:)?tt_msg_field>/i', $body, $fieldMatches);
-
-        $messages = [];
-        foreach ($descMatches[1] as $i => $desc) {
-            $desc = trim($desc);
-            if ($desc === '') {
-                continue;
-            }
-            $field = trim($fieldMatches[1][$i] ?? '');
-            $messages[] = $field !== '' ? "{$desc} (field: {$field})" : $desc;
-        }
-
-        return $messages ? implode('; ', array_unique($messages)) : null;
     }
 
     private function esc(?string $value): string

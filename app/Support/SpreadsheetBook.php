@@ -82,8 +82,8 @@ XML;
      */
     private static function fromXml(string $contents): Collection
     {
-        $contents = preg_replace('/xmlns(:[a-z0-9]+)?="[^"]*"/i', '', $contents) ?? $contents;
-        $xml = simplexml_load_string($contents);
+        $contents = preg_replace('/^\xEF\xBB\xBF/', '', $contents) ?? $contents;
+        $xml = self::loadSpreadsheetXml($contents);
         if ($xml === false) {
             return collect();
         }
@@ -91,13 +91,27 @@ XML;
         $rows = [];
         $headers = [];
 
-        foreach ($xml->xpath('//Row') ?: [] as $index => $row) {
+        foreach ($xml->xpath('//*[local-name()="Row"]') ?: [] as $row) {
             $values = [];
-            foreach ($row->Cell ?? [] as $cell) {
-                $values[] = trim((string) ($cell->Data ?? $cell));
+            $col = 0;
+            foreach ($row->xpath('./*[local-name()="Cell"]') ?: [] as $cell) {
+                $explicit = self::spreadsheetIndex($cell);
+                if ($explicit > 0) {
+                    $col = $explicit - 1;
+                }
+                $data = $cell->xpath('./*[local-name()="Data"]');
+                $values[$col] = trim((string) (($data[0] ?? null) ?: $cell));
+                $col++;
             }
 
-            if ($index === 0) {
+            if ($values === []) {
+                continue;
+            }
+
+            ksort($values);
+            $values = array_values($values);
+
+            if ($headers === []) {
                 $headers = array_map(fn ($h) => strtolower(trim($h)), $values);
 
                 continue;
@@ -105,12 +119,75 @@ XML;
 
             $assoc = [];
             foreach ($headers as $i => $header) {
+                if ($header === '') {
+                    continue;
+                }
                 $assoc[$header] = $values[$i] ?? '';
             }
             $rows[] = $assoc;
         }
 
         return collect($rows);
+    }
+
+    private static function loadSpreadsheetXml(string $contents): \SimpleXMLElement|false
+    {
+        $xml = self::silenceSimpleXml($contents);
+        if ($xml !== false) {
+            return $xml;
+        }
+
+        // Excel sering menulis atribut ss:ID / ss:Type. Jangan hapus xmlns
+        // tanpa juga menghapus prefix atribut, atau simplexml meledak 500.
+        return self::silenceSimpleXml(self::stripSpreadsheetNamespaces($contents));
+    }
+
+    private static function silenceSimpleXml(string $contents): \SimpleXMLElement|false
+    {
+        $previous = libxml_use_internal_errors(true);
+        try {
+            $xml = simplexml_load_string($contents);
+
+            return $xml === false ? false : $xml;
+        } catch (\Throwable) {
+            return false;
+        } finally {
+            libxml_clear_errors();
+            libxml_use_internal_errors($previous);
+        }
+    }
+
+    private static function stripSpreadsheetNamespaces(string $contents): string
+    {
+        $contents = preg_replace('/xmlns(:[a-z0-9]+)?="[^"]*"/i', '', $contents) ?? $contents;
+        $contents = preg_replace('/\s+[a-zA-Z_][\w.-]*:[A-Za-z_][\w.-]*="[^"]*"/', '', $contents) ?? $contents;
+
+        return preg_replace_callback(
+            '/<\/?[a-zA-Z_][\w.-]*:/',
+            static fn (array $m): string => str_starts_with($m[0], '</') ? '</' : '<',
+            $contents
+        ) ?? $contents;
+    }
+
+    private static function spreadsheetIndex(\SimpleXMLElement $cell): int
+    {
+        $candidates = [
+            $cell->attributes(),
+            $cell->attributes('ss', true),
+            $cell->attributes('urn:schemas-microsoft-com:office:spreadsheet'),
+        ];
+
+        foreach ($candidates as $attrs) {
+            if ($attrs === null) {
+                continue;
+            }
+            $index = (int) ($attrs['Index'] ?? 0);
+            if ($index > 0) {
+                return $index;
+            }
+        }
+
+        return (int) ($cell['Index'] ?? 0);
     }
 
     /**
