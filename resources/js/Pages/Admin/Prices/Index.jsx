@@ -32,7 +32,7 @@ function PriceRow({ item }) {
                     />
                     <PrimaryButton
                         type="button"
-                        className="bg-brand"
+                        className="bg-surface px-3 text-ink ring-1 ring-inset ring-line hover:bg-canvas"
                         disabled={processing}
                         onClick={() => patch(route('admin.prices.update', item.qad_code))}
                     >
@@ -83,7 +83,7 @@ export default function Index({ items, filters }) {
                 <div className="flex flex-wrap gap-2">
                     <a
                         href={route('admin.prices.export')}
-                        className="rounded-md border border-line px-3 py-2 text-sm font-medium"
+                        className="rounded-xl border border-line px-3 py-2 text-sm font-medium"
                     >
                         Export
                     </a>

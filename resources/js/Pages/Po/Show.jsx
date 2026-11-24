@@ -55,7 +55,7 @@ function ChangeBadge({ ordered, confirmed }) {
     }
     return (
         <span
-            className={`inline-flex flex-col rounded-md border px-2 py-1 text-xs font-semibold ${badge.className}`}
+            className={`inline-flex flex-col rounded-xl border px-2 py-1 text-xs font-semibold ${badge.className}`}
             title={badge.hint}
         >
             <span>{badge.label}</span>
@@ -203,14 +203,14 @@ function ScheduleMatrix({
 
     if (rows.length === 0) {
         return (
-            <div className="rounded-lg border border-dashed border-line bg-canvas-soft px-4 py-8 text-center text-sm text-ink-muted">
+            <div className="rounded-xl border border-dashed border-line bg-canvas-soft px-4 py-8 text-center text-sm text-ink-muted">
                 Belum ada item / jadwal pengiriman.
             </div>
         );
     }
 
     return (
-        <div className="-mx-1 overflow-x-auto rounded-lg border border-line">
+        <div className="-mx-1 overflow-x-auto rounded-xl border border-line">
             <table className="min-w-full border-collapse text-sm">
                 <thead>
                     <tr className="bg-canvas text-ink-soft">
@@ -655,7 +655,7 @@ export default function Show({ order, hideInternalHistory = false }) {
                         {canEdit && order.status === 'draft' && (
                             <Link
                                 href={route('purchase-orders.edit', order.id)}
-                                className="rounded-md border border-line px-3 py-2 text-sm"
+                                className="rounded-xl border border-line px-3 py-2 text-sm"
                             >
                                 Edit Draft
                             </Link>
@@ -709,14 +709,14 @@ export default function Show({ order, hideInternalHistory = false }) {
                                 )}
                             </dl>
                             {!hideInternalHistory && order.rejection_reason && (
-                                <div className="mt-4 rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800">
+                                <div className="mt-4 rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800">
                                     Alasan reject: {order.rejection_reason}
                                 </div>
                             )}
 
                             {!hideInternalHistory && signedPoRelevant && (
                                 <div
-                                    className={`mt-4 rounded-lg border p-3 text-sm ${
+                                    className={`mt-4 rounded-xl border p-3 text-sm ${
                                         order.has_signed_po
                                             ? 'border-brand-line bg-brand-muted text-brand-deep'
                                             : 'border-amber-200 bg-amber-50 text-amber-900'
@@ -744,7 +744,7 @@ export default function Show({ order, hideInternalHistory = false }) {
                                                     'purchase-orders.download-signed-po',
                                                     order.id,
                                                 )}
-                                                className="rounded-md border border-brand-line bg-surface px-3 py-1.5 text-xs font-semibold text-brand hover:bg-brand-muted"
+                                                className="rounded-xl border border-brand-line bg-surface px-3 py-1.5 text-xs font-semibold text-brand hover:bg-brand-muted"
                                             >
                                                 Unduh Signed PO
                                             </a>
@@ -806,7 +806,7 @@ export default function Show({ order, hideInternalHistory = false }) {
                                           : 'Jadwal Pengiriman'}
                                 </h3>
                                 {dueMonth && (
-                                    <span className="rounded-md bg-brand-muted px-3 py-1 text-sm font-medium text-brand-deep">
+                                    <span className="rounded-xl bg-brand-muted px-3 py-1 text-sm font-medium text-brand-deep">
                                         {monthTitle(dueMonth)} · tgl 1–{dueMonth.days}
                                     </span>
                                 )}
@@ -830,7 +830,7 @@ export default function Show({ order, hideInternalHistory = false }) {
                                     hideInternalHistory={hideInternalHistory}
                                 />
                             ) : (
-                                <div className="rounded-lg border border-dashed border-line bg-canvas-soft px-4 py-8 text-center text-sm text-ink-muted">
+                                <div className="rounded-xl border border-dashed border-line bg-canvas-soft px-4 py-8 text-center text-sm text-ink-muted">
                                     Due date tidak valid — kolom tanggal tidak bisa ditampilkan.
                                 </div>
                             )}
@@ -847,7 +847,7 @@ export default function Show({ order, hideInternalHistory = false }) {
                                     {visibleSchedules.map((schedule) => (
                                         <div
                                             key={schedule.id}
-                                            className="rounded-lg border border-line p-4"
+                                            className="rounded-xl border border-line p-4"
                                         >
                                             <div className="flex flex-wrap items-center justify-between gap-2">
                                                 <div>
@@ -893,7 +893,7 @@ export default function Show({ order, hideInternalHistory = false }) {
                                             </div>
 
                                             {canGenerateDn && !schedule.delivery_note && (
-                                                <div className="mt-4 rounded-lg border border-brand-line bg-brand-muted p-3">
+                                                <div className="mt-4 rounded-xl border border-brand-line bg-brand-muted p-3">
                                                     <div className="grid gap-3 sm:grid-cols-2">
                                                         <div>
                                                             <InputLabel value="No. Surat Jalan Internal RM" />
@@ -1049,7 +1049,7 @@ export default function Show({ order, hideInternalHistory = false }) {
                                 <div className="mt-3">
                                     <InputLabel value="Catatan harga ke Purchasing" />
                                     <textarea
-                                        className="mt-1 w-full rounded-md border-line"
+                                        className="mt-1 w-full rounded-xl border-line"
                                         rows={2}
                                         value={rmForm.data.rm_price_notes}
                                         onChange={(e) =>
@@ -1091,12 +1091,12 @@ export default function Show({ order, hideInternalHistory = false }) {
                                     Persetujuan Purchasing
                                 </h3>
                                 {(errors?.qad || order.qad_error_message) && (
-                                    <div className="mt-3 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-800">
+                                    <div className="mt-3 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-800">
                                         {errors?.qad || order.qad_error_message}
                                     </div>
                                 )}
                                 {order.rm_price_notes && (
-                                    <div className="mt-3 rounded-md border border-amber-200 bg-surface px-3 py-2 text-sm">
+                                    <div className="mt-3 rounded-xl border border-amber-200 bg-surface px-3 py-2 text-sm">
                                         <p className="font-medium text-ink">Catatan harga dari RM</p>
                                         <p className="mt-1 text-ink-soft">{order.rm_price_notes}</p>
                                     </div>
@@ -1139,7 +1139,7 @@ export default function Show({ order, hideInternalHistory = false }) {
                                 <div className="mt-4 space-y-2">
                                     <InputLabel value="Alasan reject (jika ditolak)" />
                                     <textarea
-                                        className="w-full rounded-md border-line"
+                                        className="w-full rounded-xl border-line"
                                         rows={2}
                                         value={rejectReason}
                                         onChange={(e) => setRejectReason(e.target.value)}
@@ -1147,7 +1147,7 @@ export default function Show({ order, hideInternalHistory = false }) {
                                     <div className="flex flex-wrap items-center gap-3">
                                         <button
                                             type="button"
-                                            className="rounded-md border border-rose-300 bg-surface px-3 py-2 text-sm font-medium text-rose-700"
+                                            className="rounded-xl border border-rose-300 bg-surface px-3 py-2 text-sm font-medium text-rose-700"
                                             onClick={() =>
                                                 router.post(route('purchase-orders.reject', order.id), {
                                                     reason: rejectReason,
@@ -1157,7 +1157,7 @@ export default function Show({ order, hideInternalHistory = false }) {
                                             Tolak & minta submit ulang
                                         </button>
                                         <PrimaryButton
-                                            className="bg-emerald-700 hover:bg-emerald-800"
+                                            className="bg-emerald-600 hover:bg-emerald-700"
                                             onClick={() => setShowRemarksModal(true)}
                                         >
                                             Confirm OK
@@ -1181,7 +1181,7 @@ export default function Show({ order, hideInternalHistory = false }) {
 
                     {showRemarksModal && (
                         <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 p-4">
-                            <div className="w-full max-w-md rounded-xl bg-surface p-5 shadow-lg">
+                            <div className="w-full max-w-md rounded-2xl border border-line bg-surface p-5 shadow-lift">
                                 <h3 className="font-semibold text-ink">Confirm OK — Remarks QAD</h3>
                                 <p className="mt-1 text-sm text-ink-muted">
                                     Remarks akan di-append setelah nomor draft, maks. 40 karakter
@@ -1189,7 +1189,7 @@ export default function Show({ order, hideInternalHistory = false }) {
                                 </p>
                                 <InputLabel value="Remarks" className="mt-3" />
                                 <textarea
-                                    className="mt-1 w-full rounded-md border-line"
+                                    className="mt-1 w-full rounded-xl border-line"
                                     rows={3}
                                     maxLength={Math.max(
                                         0,
@@ -1199,7 +1199,7 @@ export default function Show({ order, hideInternalHistory = false }) {
                                     onChange={(e) => setQadRemarks(e.target.value)}
                                     autoFocus
                                 />
-                                <p className="mt-2 rounded-md bg-canvas-soft px-3 py-2 font-mono text-sm text-ink">
+                                <p className="mt-2 rounded-xl bg-canvas-soft px-3 py-2 font-mono text-sm text-ink">
                                     {(`${order.po_number}${qadRemarks.trim() ? `, ${qadRemarks.trim()}` : ''}`).slice(
                                         0,
                                         40,
@@ -1214,20 +1214,20 @@ export default function Show({ order, hideInternalHistory = false }) {
                                     /40)
                                 </p>
                                 {(errors?.qad || order.qad_error_message) && (
-                                    <div className="mt-3 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-800">
+                                    <div className="mt-3 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-800">
                                         {errors?.qad || order.qad_error_message}
                                     </div>
                                 )}
                                 <div className="mt-4 flex justify-end gap-2">
                                     <button
                                         type="button"
-                                        className="rounded-md border border-line px-3 py-2 text-sm"
+                                        className="rounded-xl border border-line px-3 py-2 text-sm"
                                         onClick={() => setShowRemarksModal(false)}
                                     >
                                         Batal
                                     </button>
                                     <PrimaryButton
-                                        className="bg-emerald-700"
+                                        className="bg-emerald-600"
                                         onClick={() => {
                                             router.post(
                                                 route('purchase-orders.approve', order.id),

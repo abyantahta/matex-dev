@@ -6,6 +6,7 @@
     :root {
         --matex-ease: cubic-bezier(0.22, 1, 0.36, 1);
         --matex-duration: 220ms;
+        --matex-gradient: linear-gradient(115deg, #ECE8FF 0%, #F6E8FA 45%, #FFE9EC 75%, #FFF1E4 100%);
     }
 
     html {
@@ -14,7 +15,6 @@
 
     body {
         @apply bg-canvas font-sans text-ink antialiased;
-        font-feature-settings: 'ss01' on, 'kern' on;
     }
 
     ::selection {
@@ -24,18 +24,53 @@
     h1,
     h2,
     h3 {
-        font-family: Sora, 'IBM Plex Sans', ui-sans-serif, system-ui, sans-serif;
-        @apply tracking-tight text-ink;
+        font-family: 'Plus Jakarta Sans', Inter, ui-sans-serif, system-ui, sans-serif;
+        letter-spacing: -0.02em;
+        @apply text-ink;
     }
 
     .font-display {
-        font-family: Sora, 'IBM Plex Sans', ui-sans-serif, system-ui, sans-serif;
+        font-family: 'Plus Jakarta Sans', Inter, ui-sans-serif, system-ui, sans-serif;
+        letter-spacing: -0.015em;
+    }
+
+    table {
+        font-variant-numeric: tabular-nums;
+    }
+
+    :focus-visible {
+        outline: 2px solid theme('colors.brand.DEFAULT / 50%');
+        outline-offset: 2px;
+    }
+
+    input[type='file'] {
+        @apply text-sm text-ink-muted;
+    }
+
+    input[type='file']::file-selector-button {
+        @apply me-3 cursor-pointer rounded-xl border-0 bg-brand-muted px-3.5 py-2 text-sm font-semibold text-brand-deep transition-colors hover:bg-brand-line/70;
+    }
+
+    ::-webkit-scrollbar {
+        width: 10px;
+        height: 10px;
+    }
+
+    ::-webkit-scrollbar-thumb {
+        background: theme('colors.line.strong');
+        border: 3px solid transparent;
+        border-radius: 999px;
+        background-clip: content-box;
+    }
+
+    ::-webkit-scrollbar-track {
+        background: transparent;
     }
 }
 
 @layer components {
     .ui-panel {
-        @apply rounded-panel border border-line bg-surface shadow-panel;
+        @apply rounded-panel border border-line/80 bg-surface shadow-panel;
         transition:
             transform var(--matex-duration) var(--matex-ease),
             box-shadow var(--matex-duration) var(--matex-ease),
@@ -44,47 +79,96 @@
 
     .ui-panel-interactive:hover {
         @apply border-brand-line shadow-lift;
-        transform: translateY(-2px);
+        transform: translateY(-3px);
     }
 
     .ui-page {
-        @apply w-full px-3 py-4 sm:px-4 lg:px-5;
+        @apply mx-auto w-full max-w-[1600px] px-4 py-6 sm:px-6 lg:px-8;
     }
 
     .ui-section-title {
-        @apply font-display text-lg font-semibold text-ink sm:text-xl;
+        @apply font-display text-2xl font-extrabold tracking-tight text-ink sm:text-[1.75rem];
     }
 
     .ui-eyebrow {
-        @apply font-display text-[0.6875rem] font-semibold uppercase tracking-[0.14em] text-brand;
+        @apply font-display text-[0.6875rem] font-bold uppercase tracking-[0.14em] text-brand-deep;
     }
 
     .ui-link {
-        @apply font-medium text-brand transition duration-220 ease-matex hover:text-brand-deep;
+        @apply font-semibold text-brand underline-offset-4 transition duration-220 ease-matex hover:text-brand-deep hover:underline;
     }
 
     .ui-table-head {
-        @apply bg-canvas-soft text-left text-[0.6875rem] font-semibold uppercase tracking-[0.08em] text-ink-muted;
+        @apply border-b border-line bg-canvas-soft text-left text-[0.6875rem] font-bold uppercase tracking-[0.08em] text-ink-muted;
     }
 
     .ui-row {
-        @apply transition-colors duration-220 ease-matex hover:bg-canvas-soft/80;
+        @apply transition-colors duration-220 ease-matex hover:bg-brand-muted/50;
     }
 
     .ui-tab {
-        @apply inline-flex items-center rounded-md px-3 py-1.5 text-sm font-medium transition duration-220 ease-matex;
+        @apply inline-flex items-center rounded-full px-4 py-2 text-sm font-semibold transition duration-220 ease-matex;
     }
 
     .ui-tab-active {
-        @apply bg-brand text-white shadow-sm;
+        @apply bg-brand-muted text-brand-deep ring-1 ring-inset ring-brand-line;
     }
 
     .ui-tab-idle {
-        @apply bg-surface text-ink-muted ring-1 ring-line hover:-translate-y-0.5 hover:text-ink hover:shadow-sm;
+        @apply bg-surface text-ink-muted ring-1 ring-inset ring-line hover:bg-brand-muted hover:text-brand-deep hover:ring-brand-line;
+    }
+
+    .ui-gradient {
+        background-image: var(--matex-gradient);
+    }
+
+    /* ---------- Pastel page hero (wraps every page header) ---------- */
+    .ui-hero {
+        @apply relative isolate overflow-hidden rounded-[1.5rem] border border-white px-6 py-7 sm:px-8 sm:py-8;
+        background-image: var(--matex-gradient);
+        box-shadow: 0 1px 2px rgba(37, 35, 58, 0.03), 0 18px 40px -30px rgba(116, 103, 216, 0.5);
+    }
+
+    .ui-hero::before {
+        content: '';
+        @apply pointer-events-none absolute -right-10 -top-24 -z-10 h-64 w-64 rounded-full;
+        background: radial-gradient(circle, rgba(186, 230, 253, 0.7), transparent 65%);
+    }
+
+    .ui-hero::after {
+        content: '';
+        @apply pointer-events-none absolute -bottom-28 right-1/3 -z-10 h-56 w-56 rounded-full;
+        background: radial-gradient(circle, rgba(209, 250, 229, 0.75), transparent 65%);
+    }
+
+    .ui-hero .ui-eyebrow {
+        @apply inline-flex items-center rounded-full bg-white/70 px-2.5 py-1 text-brand-deep ring-1 ring-inset ring-brand-line;
+    }
+
+    .ui-hero :is(a, button).bg-ink {
+        @apply bg-brand text-white hover:bg-brand-deep;
+    }
+
+    .ui-hero [role='switch'].bg-line {
+        background-color: theme('colors.line.strong');
+    }
+
+    .ui-hero :is(a, button).border-line:not(.bg-surface) {
+        @apply bg-white/70;
     }
 }
 
 @layer utilities {
+    .sidebar-scroll {
+        scrollbar-width: thin;
+        scrollbar-color: theme('colors.line.strong') transparent;
+    }
+
+    .sidebar-scroll::-webkit-scrollbar-thumb {
+        background: theme('colors.line.strong');
+        background-clip: content-box;
+    }
+
     .no-spin::-webkit-outer-spin-button,
     .no-spin::-webkit-inner-spin-button {
         -webkit-appearance: none;
@@ -102,7 +186,8 @@
             box-shadow var(--matex-duration) var(--matex-ease),
             background-color var(--matex-duration) var(--matex-ease),
             border-color var(--matex-duration) var(--matex-ease),
-            color var(--matex-duration) var(--matex-ease);
+            color var(--matex-duration) var(--matex-ease),
+            filter var(--matex-duration) var(--matex-ease);
     }
 
     .pressable:hover {

@@ -63,7 +63,7 @@ export default function Index({ items, filters, lastSyncedAt, totalItems, syncSt
                         type="button"
                         disabled={syncInFlight}
                         onClick={handleSync}
-                        className="pressable rounded-md bg-brand px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-brand-deep disabled:cursor-not-allowed disabled:opacity-60"
+                        className="pressable inline-flex items-center gap-2 rounded-xl bg-brand px-4 py-2.5 text-sm font-semibold text-white hover:bg-brand-deep disabled:cursor-not-allowed disabled:opacity-60"
                     >
                         {syncInFlight ? 'Sedang sync…' : 'Sync Sekarang'}
                     </button>
@@ -71,7 +71,7 @@ export default function Index({ items, filters, lastSyncedAt, totalItems, syncSt
 
                 {syncStatus?.message && (
                     <div
-                        className={`mt-4 rounded-lg border px-4 py-3 text-sm ${
+                        className={`mt-4 rounded-xl border px-4 py-3 text-sm ${
                             STATUS_STYLES[syncStatus.status] ??
                             'border-sky-200 bg-sky-50 text-sky-900'
                         }`}
@@ -91,7 +91,7 @@ export default function Index({ items, filters, lastSyncedAt, totalItems, syncSt
                 <input
                     type="search"
                     placeholder="Cari kode / nama / part number..."
-                    className="rounded-md border-line text-sm"
+                    className="rounded-xl border-line text-sm"
                     defaultValue={filters.q}
                     onKeyDown={(e) => {
                         if (e.key === 'Enter') {

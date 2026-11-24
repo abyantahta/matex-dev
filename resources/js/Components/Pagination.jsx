@@ -20,7 +20,7 @@ export default function Pagination({ paginator }) {
                     return (
                         <span
                             key={`${label}-${index}`}
-                            className="rounded-md px-2.5 py-1 text-sm text-ink-faint"
+                            className="rounded-xl px-2.5 py-1 text-sm text-ink-faint"
                             dangerouslySetInnerHTML={{ __html: label }}
                         />
                     );
@@ -32,10 +32,10 @@ export default function Pagination({ paginator }) {
                         href={link.url}
                         preserveState
                         preserveScroll
-                        className={`rounded-md px-2.5 py-1 text-sm transition duration-220 ease-matex ${
+                        className={`min-w-[2rem] rounded-xl px-2.5 py-1 text-center text-sm transition duration-220 ease-matex ${
                             link.active
-                                ? 'bg-brand font-semibold text-white'
-                                : 'text-ink-soft hover:bg-canvas-soft'
+                                ? 'bg-brand-muted font-semibold text-brand-deep ring-1 ring-inset ring-brand-line'
+                                : 'text-ink-soft hover:bg-brand-muted hover:text-brand-deep'
                         }`}
                         dangerouslySetInnerHTML={{ __html: label }}
                     />

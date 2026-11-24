@@ -1,4 +1,8 @@
+import { useId } from 'react';
+
 export default function ApplicationLogo({ className = '', ...props }) {
+    const gid = useId().replace(/:/g, '');
+
     return (
         <svg
             {...props}
@@ -8,12 +12,19 @@ export default function ApplicationLogo({ className = '', ...props }) {
             className={className}
             aria-hidden="true"
         >
-            <rect width="48" height="48" rx="12" className="fill-brand" />
+            <defs>
+                <linearGradient id={`mx-${gid}`} x1="0" y1="0" x2="48" y2="48" gradientUnits="userSpaceOnUse">
+                    <stop offset="0" stopColor="#8F84EC" />
+                    <stop offset="0.55" stopColor="#B79CF0" />
+                    <stop offset="1" stopColor="#F3A9C4" />
+                </linearGradient>
+            </defs>
+            <rect width="48" height="48" rx="14" fill={`url(#mx-${gid})`} />
             <path
-                d="M12 34V14h4.6l7.4 14.2L31.4 14H36v20h-3.8V21.2L25.4 34h-2.8L15.8 21.2V34H12Z"
-                className="fill-white"
+                d="M13 33V15h4.2l6.8 12.6L30.8 15H35v18h-3.6V21.6L25.3 33h-2.6l-6.1-11.4V33H13Z"
+                fill="#fff"
             />
-            <path d="M12 36.5h24" stroke="currentColor" strokeWidth="1.5" className="text-brand-bright/80" />
+            <circle cx="37.5" cy="10.5" r="2.5" fill="#FDE68A" />
         </svg>
     );
 }

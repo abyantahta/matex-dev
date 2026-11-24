@@ -21,7 +21,7 @@ function SrBadge({ score }) {
     else if (score < 85) tone = 'bg-amber-100 text-amber-900';
 
     return (
-        <span className={`inline-flex min-w-[3rem] justify-center rounded-md px-2 py-1 text-sm font-bold tabular-nums ${tone}`}>
+        <span className={`inline-flex min-w-[3rem] justify-center rounded-xl px-2 py-1 text-sm font-semibold tabular-nums ${tone}`}>
             {score}
         </span>
     );
@@ -38,7 +38,7 @@ function StatCard({ label, value, hint, tone = 'default' }) {
     return (
         <div className="ui-panel p-5">
             <p className="ui-eyebrow">{label}</p>
-            <p className={`mt-3 font-display text-3xl font-bold tabular-nums ${valueClass}`}>
+            <p className={`mt-3 font-display text-3xl font-semibold tabular-nums ${valueClass}`}>
                 {value}
             </p>
             {hint && <p className="mt-1 text-xs text-ink-muted">{hint}</p>}
@@ -75,7 +75,7 @@ export default function Index({
                     <div>
                         <label className="ui-eyebrow">Filter supplier</label>
                         <select
-                            className="mt-1 block rounded-md border-line text-sm"
+                            className="mt-1 block rounded-xl border-line text-sm"
                             value={filters.supplier_id ?? ''}
                             onChange={(e) =>
                                 applyFilters({

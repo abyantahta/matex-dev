@@ -26,7 +26,7 @@ export default function Login({ status, canResetPassword }) {
             <Head title="Log in" />
 
             {status && (
-                <div className="mb-4 rounded-md border border-brand-line bg-brand-muted px-3 py-2 text-sm font-medium text-brand-deep">
+                <div className="mb-4 rounded-xl border border-brand-line bg-brand-muted px-3 py-2 text-sm font-medium text-brand-deep">
                     {status}
                 </div>
             )}

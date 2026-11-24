@@ -54,7 +54,7 @@ export default function Index({ ready, history, receivingEnabled }) {
 
             <div className="ui-page space-y-4">
                     {!receivingEnabled && (
-                        <div className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-900">
+                        <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-900">
                             <strong>Receiving sementara dinonaktifkan.</strong> Fitur ini
                             dimatikan lewat config — jangan proses receiving dulu sampai
                             diaktifkan kembali.
@@ -78,7 +78,7 @@ export default function Index({ ready, history, receivingEnabled }) {
                                     return (
                                         <div
                                             key={note.id}
-                                            className="flex flex-wrap items-end justify-between gap-3 rounded-xl border border-line bg-surface p-4 shadow-sm"
+                                            className="flex flex-wrap items-end justify-between gap-3 rounded-xl border border-line bg-surface p-4"
                                         >
                                             <div>
                                                 <p className="font-semibold text-ink">
@@ -106,7 +106,7 @@ export default function Index({ ready, history, receivingEnabled }) {
                                                     </p>
                                                 )}
                                                 {note.qad_error_message && (
-                                                    <div className="mt-2 max-w-xl rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-xs leading-snug text-rose-800">
+                                                    <div className="mt-2 max-w-xl rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs leading-snug text-rose-800">
                                                         <span className="font-semibold">
                                                             Percobaan receiving terakhir ditolak QAD
                                                             {note.last_failed_receiving?.received_at
@@ -123,11 +123,11 @@ export default function Index({ ready, history, receivingEnabled }) {
                                                 <div className="flex items-center gap-2">
                                                     <Link
                                                         href={route('delivery-notes.show', note.id)}
-                                                        className="rounded-md border border-line px-3 py-2 text-sm"
+                                                        className="rounded-xl border border-line px-3 py-2 text-sm"
                                                     >
                                                         Detail
                                                     </Link>
-                                                    <span className="rounded-md bg-rose-50 px-3 py-2 text-xs font-medium text-rose-700">
+                                                    <span className="rounded-xl bg-rose-50 px-3 py-2 text-xs font-medium text-rose-700">
                                                         Receiving dinonaktifkan
                                                     </span>
                                                 </div>
@@ -135,7 +135,7 @@ export default function Index({ ready, history, receivingEnabled }) {
                                                 <div className="flex items-center gap-2">
                                                     <Link
                                                         href={route('delivery-notes.show', note.id)}
-                                                        className="rounded-md border border-line px-3 py-2 text-sm"
+                                                        className="rounded-xl border border-line px-3 py-2 text-sm"
                                                     >
                                                         Detail
                                                     </Link>
@@ -147,7 +147,7 @@ export default function Index({ ready, history, receivingEnabled }) {
                                                         Qty beda?
                                                     </button>
                                                     <PrimaryButton
-                                                        className="bg-emerald-700 hover:bg-emerald-800"
+                                                        className="bg-emerald-600 hover:bg-emerald-700"
                                                         disabled={processingId === note.id}
                                                         onClick={() =>
                                                             submitReceive(note, note.remaining_qty)
@@ -181,13 +181,13 @@ export default function Index({ ready, history, receivingEnabled }) {
                                                     </div>
                                                     <button
                                                         type="button"
-                                                        className="rounded-md border border-line px-3 py-2 text-sm"
+                                                        className="rounded-xl border border-line px-3 py-2 text-sm"
                                                         onClick={() => setPartialOpenId(null)}
                                                     >
                                                         Batal
                                                     </button>
                                                     <PrimaryButton
-                                                        className="bg-emerald-700 hover:bg-emerald-800"
+                                                        className="bg-emerald-600 hover:bg-emerald-700"
                                                         disabled={processingId === note.id}
                                                         onClick={() =>
                                                             submitReceive(note, partialQty)
@@ -244,7 +244,7 @@ export default function Index({ ready, history, receivingEnabled }) {
                                                             type="button"
                                                             disabled={retryingId === r.id}
                                                             onClick={() => retryQad(r)}
-                                                            className="rounded-md border border-rose-300 bg-rose-50 px-2.5 py-1 text-xs font-semibold text-rose-800 hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-50"
+                                                            className="rounded-xl border border-rose-300 bg-rose-50 px-2.5 py-1 text-xs font-semibold text-rose-800 hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-50"
                                                         >
                                                             {retryingId === r.id
                                                                 ? 'Mengirim…'

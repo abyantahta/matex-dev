@@ -93,22 +93,24 @@ function Icon({ name, className = 'h-5 w-5' }) {
 
 function HeroStat({ value }) {
     return (
-        <div className="ui-panel relative overflow-hidden border-0 bg-gradient-to-br from-brand-deep to-brand lg:col-span-2">
+        <div className="ui-panel ui-gradient relative overflow-hidden !border-white lg:col-span-2">
+            <div className="pointer-events-none absolute -right-10 -top-10 h-44 w-44 rounded-full bg-sky-200/70 blur-3xl" />
+            <div className="pointer-events-none absolute -bottom-12 left-10 h-36 w-36 rounded-full bg-emerald-100/80 blur-3xl" />
             <div className="relative z-10 flex min-h-[140px] flex-col justify-between p-6">
                 <div>
-                    <p className="font-display text-[0.6875rem] font-semibold uppercase tracking-[0.14em] text-white/80">
+                    <p className="font-display text-[0.6875rem] font-bold uppercase tracking-[0.14em] text-brand-deep">
                         {statLabel(HERO_KEY)}
                     </p>
-                    <p className="mt-3 font-display text-[2.75rem] font-bold leading-none tabular-nums text-white">
+                    <p className="mt-3 font-display text-5xl font-extrabold leading-none tabular-nums text-ink">
                         {formatCount(value)}
                     </p>
                 </div>
-                <p className="mt-4 text-xs text-brand-line">item master tersinkron dari QAD</p>
+                <p className="mt-4 inline-flex w-fit rounded-full bg-white/70 px-2.5 py-1 text-xs font-semibold text-ink-soft ring-1 ring-inset ring-white">item master tersinkron dari QAD</p>
             </div>
             <svg
                 viewBox="0 0 48 48"
                 fill="currentColor"
-                className="pointer-events-none absolute -bottom-6 -right-4 h-40 w-40 text-white opacity-[0.06]"
+                className="pointer-events-none absolute -bottom-6 -right-4 h-40 w-40 text-brand opacity-[0.07]"
                 aria-hidden="true"
             >
                 <path d="M12 34V14h4.6l7.4 14.2L31.4 14H36v20h-3.8V21.2L25.4 34h-2.8L15.8 21.2V34H12Z" />
@@ -121,23 +123,24 @@ function StatStrip({ entries }) {
     return (
         <div className="ui-panel overflow-x-auto lg:col-span-4">
             <div className="flex h-full min-w-max divide-x divide-line">
-                {entries.map(([key, value]) => {
+                {entries.map(([key, value], i) => {
                     const active = Number(value) > 0;
+                    const dot = ['bg-sky-300', 'bg-emerald-300', 'bg-amber-300', 'bg-pink-300', 'bg-violet-300'][i % 5];
                     return (
                         <div
                             key={key}
-                            className="flex min-w-[160px] flex-1 flex-col justify-center p-5 lg:p-6"
+                            className="flex min-w-[128px] flex-1 flex-col justify-center p-5"
                         >
                             <div className="flex items-center gap-2">
                                 <span
                                     className={
-                                        'h-1.5 w-1.5 rounded-full ' +
-                                        (active ? 'bg-brand-bright' : 'bg-ink-faint')
+                                        'h-2 w-2 rounded-full ' +
+                                        (active ? dot : 'bg-ink-faint')
                                     }
                                 />
                                 <p className="ui-eyebrow">{statLabel(key)}</p>
                             </div>
-                            <p className="mt-3 font-display text-3xl font-bold leading-tight tabular-nums text-ink">
+                            <p className="mt-3 font-display text-3xl font-extrabold leading-tight tabular-nums text-ink">
                                 {formatCount(value)}
                             </p>
                         </div>
@@ -148,7 +151,17 @@ function StatStrip({ entries }) {
     );
 }
 
+const CARD_TONES = [
+    'bg-indigo-100 text-indigo-500',
+    'bg-teal-100 text-teal-600',
+    'bg-orange-100 text-orange-500',
+    'bg-pink-100 text-pink-500',
+    'bg-amber-100 text-amber-600',
+    'bg-sky-100 text-sky-600',
+];
+
 function LinkCard({ table, index }) {
+    const tone = CARD_TONES[index % CARD_TONES.length];
     return (
         <Link
             href={route(table.route)}
@@ -156,7 +169,7 @@ function LinkCard({ table, index }) {
             style={{ animationDelay: `${120 + index * 40}ms` }}
         >
             <div className="flex items-start gap-4">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-muted text-brand">
+                <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl ${tone}`}>
                     <Icon name={TABLE_ICONS[table.key]} />
                 </div>
                 <div className="min-w-0 flex-1">
@@ -166,10 +179,10 @@ function LinkCard({ table, index }) {
                     </p>
                 </div>
                 <div className="flex shrink-0 flex-col items-end gap-3">
-                    <span className="rounded-md bg-brand-muted px-2.5 py-1 text-sm font-semibold leading-none text-brand-deep">
+                    <span className="rounded-xl bg-brand-muted px-2.5 py-1 text-sm font-semibold leading-none text-brand-deep">
                         {formatCount(table.count)}
                     </span>
-                    <span className="flex h-8 w-8 items-center justify-center rounded-full border border-brand-line text-brand transition-colors duration-220 ease-matex group-hover:border-brand group-hover:bg-brand group-hover:text-white">
+                    <span className="flex h-8 w-8 items-center justify-center rounded-full border border-brand-line text-brand transition-colors duration-220 ease-matex group-hover:border-brand-line group-hover:bg-brand-muted group-hover:text-brand-deep">
                         <Icon name="arrowRight" className="h-4 w-4" />
                     </span>
                 </div>

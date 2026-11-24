@@ -48,7 +48,7 @@ export default function Form({ company, types }) {
                     <div>
                         <InputLabel value="Type" />
                         <select
-                            className="mt-1 w-full rounded-md border-line"
+                            className="mt-1 w-full rounded-xl border-line"
                             value={data.type}
                             onChange={(e) => setData('type', e.target.value)}
                         >
@@ -75,7 +75,7 @@ export default function Form({ company, types }) {
                 <div>
                     <InputLabel value="Address" />
                     <textarea
-                        className="mt-1 w-full rounded-md border-line"
+                        className="mt-1 w-full rounded-xl border-line"
                         rows={2}
                         value={data.address}
                         onChange={(e) => setData('address', e.target.value)}
@@ -95,7 +95,7 @@ export default function Form({ company, types }) {
                 <div className="flex justify-end gap-3 pt-2">
                     <Link
                         href={route('admin.companies.index')}
-                        className="rounded-md border border-line px-4 py-2 text-sm"
+                        className="rounded-xl border border-line px-4 py-2 text-sm"
                     >
                         Batal
                     </Link>

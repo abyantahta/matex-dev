@@ -171,7 +171,7 @@ export default function Form({ user, prefill, qadSuppliers, roles }) {
                     <div>
                         <InputLabel value="Role" />
                         <select
-                            className="mt-1 w-full rounded-md border-line"
+                            className="mt-1 w-full rounded-xl border-line"
                             value={data.role}
                             onChange={(e) => setData('role', e.target.value)}
                         >
@@ -236,7 +236,7 @@ export default function Form({ user, prefill, qadSuppliers, roles }) {
                         />
                         <button
                             type="button"
-                            className="rounded-md border border-line px-3 py-2 text-sm"
+                            className="rounded-xl border border-line px-3 py-2 text-sm"
                             onClick={addBroadcastEmail}
                         >
                             Tambah
@@ -269,7 +269,7 @@ export default function Form({ user, prefill, qadSuppliers, roles }) {
                 <div className="flex justify-end gap-3 pt-2">
                     <Link
                         href={route('admin.users.index')}
-                        className="rounded-md border border-line px-4 py-2 text-sm"
+                        className="rounded-xl border border-line px-4 py-2 text-sm"
                     >
                         Batal
                     </Link>

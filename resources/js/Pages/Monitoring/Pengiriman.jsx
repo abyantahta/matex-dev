@@ -29,13 +29,13 @@ export default function Pengiriman({ calendar, filters, suppliersRm, lockSupplie
                 <div className="flex flex-wrap gap-3">
                     <input
                         type="month"
-                        className="rounded-md border-line text-sm"
+                        className="rounded-xl border-line text-sm"
                         value={filters.month}
                         onChange={(e) => updateFilter('month', e.target.value)}
                     />
                     {!lockSupplier && (
                         <select
-                            className="rounded-md border-line text-sm"
+                            className="rounded-xl border-line text-sm"
                             value={filters.supplier_rm_id || ''}
                             onChange={(e) => updateFilter('supplier_rm_id', e.target.value)}
                         >

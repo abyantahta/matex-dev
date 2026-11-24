@@ -19,7 +19,7 @@ export default function Index({ users, filters, roles }) {
             actions={
                 <Link
                     href={route('admin.users.create')}
-                    className="pressable rounded-md bg-brand px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-brand-deep"
+                    className="pressable inline-flex items-center gap-2 rounded-xl bg-brand px-4 py-2.5 text-sm font-semibold text-white hover:bg-brand-deep"
                 >
                     Tambah User
                 </Link>
@@ -31,7 +31,7 @@ export default function Index({ users, filters, roles }) {
                 <input
                     type="search"
                     placeholder="Cari nama / email..."
-                    className="rounded-md border-line text-sm"
+                    className="rounded-xl border-line text-sm"
                     defaultValue={filters.search}
                     onKeyDown={(e) => {
                         if (e.key === 'Enter') {
@@ -40,7 +40,7 @@ export default function Index({ users, filters, roles }) {
                     }}
                 />
                 <select
-                    className="rounded-md border-line text-sm"
+                    className="rounded-xl border-line text-sm"
                     value={filters.role || ''}
                     onChange={(e) =>
                         applyFilters({ ...filters, role: e.target.value || undefined })

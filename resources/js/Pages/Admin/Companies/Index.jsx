@@ -23,7 +23,7 @@ export default function Index({ companies, filters, types }) {
             actions={
                 <Link
                     href={route('admin.companies.create')}
-                    className="pressable rounded-md bg-brand px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-brand-deep"
+                    className="pressable inline-flex items-center gap-2 rounded-xl bg-brand px-4 py-2.5 text-sm font-semibold text-white hover:bg-brand-deep"
                 >
                     Tambah Supplier
                 </Link>
@@ -35,7 +35,7 @@ export default function Index({ companies, filters, types }) {
                 <input
                     type="search"
                     placeholder="Cari kode / nama..."
-                    className="rounded-md border-line text-sm"
+                    className="rounded-xl border-line text-sm"
                     defaultValue={filters.search}
                     onKeyDown={(e) => {
                         if (e.key === 'Enter') {
@@ -44,7 +44,7 @@ export default function Index({ companies, filters, types }) {
                     }}
                 />
                 <select
-                    className="rounded-md border-line text-sm"
+                    className="rounded-xl border-line text-sm"
                     value={filters.type || ''}
                     onChange={(e) =>
                         applyFilters({ ...filters, type: e.target.value || undefined })

@@ -51,7 +51,7 @@ export default function Index({ orders, filters }) {
                     {canCreate && (
                         <Link
                             href={route('purchase-orders.create')}
-                            className="pressable rounded-md bg-brand px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-brand-deep"
+                            className="pressable inline-flex items-center gap-2 rounded-xl bg-brand px-4 py-2.5 text-sm font-semibold text-white hover:bg-brand-deep"
                         >
                             Buat Draft PO
                         </Link>
@@ -64,7 +64,7 @@ export default function Index({ orders, filters }) {
             <div className="ui-page space-y-4">
                 <div className="flex gap-2">
                     <select
-                        className="rounded-md border-line bg-surface text-sm transition duration-220 ease-matex focus:border-brand focus:ring-brand/30"
+                        className="rounded-xl border-line bg-surface text-sm transition duration-220 ease-matex focus:border-brand focus:ring-brand/30"
                         value={filters.status || ''}
                         onChange={(e) =>
                             router.get(

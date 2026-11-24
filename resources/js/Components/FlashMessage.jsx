@@ -22,10 +22,10 @@ export default function FlashMessage() {
     return (
         <div className="ui-page !py-3">
             <div
-                className={`animate-flash-in rounded-panel border px-4 py-3 text-sm font-medium shadow-panel ${
+                className={`animate-flash-in rounded-2xl border px-4 py-3 text-sm font-semibold shadow-panel ${
                     isError
                         ? 'border-rose-200 bg-rose-50 text-rose-800'
-                        : 'border-brand-line bg-brand-muted text-brand-deep'
+                        : 'border-emerald-200 bg-emerald-50 text-emerald-800'
                 }`}
             >
                 {message}

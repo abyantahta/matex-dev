@@ -35,12 +35,12 @@ export default function Kedatangan({
                 <div className="flex flex-wrap gap-3">
                     <input
                         type="month"
-                        className="rounded-md border-line text-sm"
+                        className="rounded-xl border-line text-sm"
                         value={filters.month}
                         onChange={(e) => updateFilter('month', e.target.value)}
                     />
                     <select
-                        className="rounded-md border-line text-sm"
+                        className="rounded-xl border-line text-sm"
                         value={filters.supplier_rm_id || ''}
                         onChange={(e) => updateFilter('supplier_rm_id', e.target.value)}
                     >
@@ -53,7 +53,7 @@ export default function Kedatangan({
                     </select>
                     {showOhpFilter && (
                         <select
-                            className="rounded-md border-line text-sm"
+                            className="rounded-xl border-line text-sm"
                             value={filters.ohp_supplier_id || ''}
                             onChange={(e) => updateFilter('ohp_supplier_id', e.target.value)}
                         >

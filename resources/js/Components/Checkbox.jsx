@@ -4,7 +4,7 @@ export default function Checkbox({ className = '', ...props }) {
             {...props}
             type="checkbox"
             className={
-                'rounded border-line text-brand shadow-sm transition duration-220 ease-matex focus:ring-brand/40 ' +
+                'rounded-md border-line-strong text-brand shadow-none transition duration-220 ease-matex focus:ring-brand/40 ' +
                 className
             }
         />

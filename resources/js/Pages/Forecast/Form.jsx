@@ -81,7 +81,7 @@ export default function Form({ forecast, defaultPeriod, defaultSupplierId, suppl
                             <div>
                                 <InputLabel value="Supplier Raw Material" />
                                 <select
-                                    className="mt-1 w-full rounded-md border-line"
+                                    className="mt-1 w-full rounded-xl border-line"
                                     value={data.supplier_rm_id}
                                     onChange={(e) => setData('supplier_rm_id', e.target.value)}
                                 >
@@ -107,7 +107,7 @@ export default function Form({ forecast, defaultPeriod, defaultSupplierId, suppl
                             <div className="md:col-span-2">
                                 <InputLabel value="Catatan" />
                                 <textarea
-                                    className="mt-1 w-full rounded-md border-line"
+                                    className="mt-1 w-full rounded-xl border-line"
                                     rows={2}
                                     value={data.notes}
                                     onChange={(e) => setData('notes', e.target.value)}
@@ -139,7 +139,7 @@ export default function Form({ forecast, defaultPeriod, defaultSupplierId, suppl
                     <div className="flex justify-end gap-3">
                         <Link
                             href={route('forecasts.index')}
-                            className="rounded-md border border-line px-4 py-2 text-sm"
+                            className="rounded-xl border border-line px-4 py-2 text-sm"
                         >
                             Batal
                         </Link>

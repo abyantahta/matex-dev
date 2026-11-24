@@ -1,11 +1,11 @@
 const COLORS = {
-    slate: 'bg-canvas-soft text-ink-soft ring-1 ring-line',
-    amber: 'bg-amber-50 text-amber-900 ring-1 ring-amber-200/80',
-    orange: 'bg-copper-muted text-copper ring-1 ring-copper-line',
-    blue: 'bg-sky-50 text-sky-900 ring-1 ring-sky-200/80',
-    indigo: 'bg-indigo-50 text-indigo-900 ring-1 ring-indigo-200/70',
-    emerald: 'bg-brand-muted text-brand-deep ring-1 ring-brand-line',
-    rose: 'bg-rose-50 text-rose-800 ring-1 ring-rose-200/80',
+    slate: 'bg-canvas text-ink-soft ring-1 ring-inset ring-line',
+    amber: 'bg-amber-50 text-amber-800 ring-1 ring-inset ring-amber-200/70',
+    orange: 'bg-copper-muted text-copper ring-1 ring-inset ring-copper-line',
+    blue: 'bg-brand-muted text-brand-deep ring-1 ring-inset ring-brand-line',
+    indigo: 'bg-sky-50 text-sky-800 ring-1 ring-inset ring-sky-200/70',
+    emerald: 'bg-emerald-50 text-emerald-800 ring-1 ring-inset ring-emerald-200/70',
+    rose: 'bg-rose-50 text-rose-800 ring-1 ring-inset ring-rose-200/70',
 };
 
 const PO_STATUS = {
@@ -54,7 +54,7 @@ export default function StatusBadge({ type = 'po', value, className = '', title 
     return (
         <span
             title={title}
-            className={`inline-flex items-center rounded-md px-2 py-0.5 text-[0.6875rem] font-semibold tracking-wide ${COLORS[meta.color]} ${className}`}
+            className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-0.5 text-[0.6875rem] font-medium before:h-1.5 before:w-1.5 before:rounded-full before:bg-current before:opacity-70 before:content-[''] ${COLORS[meta.color]} ${className}`}
         >
             {meta.label}
         </span>

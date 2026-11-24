@@ -57,7 +57,7 @@ export default function Index({
                     {canUpload && (
                         <Link
                             href={route('forecasts.create')}
-                            className="pressable rounded-md bg-brand px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-brand-deep"
+                            className="pressable inline-flex items-center gap-2 rounded-xl bg-brand px-4 py-2.5 text-sm font-semibold text-white hover:bg-brand-deep"
                         >
                             Upload Forecast
                         </Link>
@@ -101,7 +101,7 @@ export default function Index({
                 {!isSupplier && (
                     <div className="flex flex-wrap gap-2">
                         <select
-                            className="rounded-md border-line bg-surface text-sm"
+                            className="rounded-xl border-line bg-surface text-sm"
                             value={filters.supplier_rm_id || ''}
                             onChange={(e) =>
                                 applyFilters({
@@ -119,7 +119,7 @@ export default function Index({
                         </select>
                         <input
                             type="month"
-                            className="rounded-md border-line bg-surface text-sm"
+                            className="rounded-xl border-line bg-surface text-sm"
                             value={filters.period || ''}
                             onChange={(e) =>
                                 applyFilters({

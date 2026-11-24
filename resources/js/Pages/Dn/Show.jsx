@@ -99,7 +99,7 @@ export default function Show({ note, sjUrl, receivingEnabled, qtyCap }) {
                         href={route('delivery-notes.print', note.id)}
                         target="_blank"
                         rel="noreferrer"
-                        className="pressable rounded-md bg-ink px-4 py-2.5 text-sm font-semibold text-white hover:bg-ink-soft"
+                        className="pressable rounded-xl bg-ink px-4 py-2.5 text-sm font-semibold text-white hover:bg-ink-soft"
                     >
                         Reprint DN
                     </a>
@@ -287,7 +287,7 @@ export default function Show({ note, sjUrl, receivingEnabled, qtyCap }) {
                                 <div>
                                     <InputLabel value="Catatan" />
                                     <textarea
-                                        className="mt-1 w-full rounded-md border-line"
+                                        className="mt-1 w-full rounded-xl border-line"
                                         rows={2}
                                         value={ohpForm.data.notes}
                                         onChange={(e) => ohpForm.setData('notes', e.target.value)}
@@ -364,7 +364,7 @@ export default function Show({ note, sjUrl, receivingEnabled, qtyCap }) {
                             {!partialOpen ? (
                                 <div className="mt-4 flex items-center gap-3">
                                     <PrimaryButton
-                                        className="bg-emerald-700 hover:bg-emerald-800"
+                                        className="bg-emerald-600 hover:bg-emerald-700"
                                         disabled={receiveProcessing}
                                         onClick={() => submitReceive(note.remaining_qty)}
                                     >
@@ -396,13 +396,13 @@ export default function Show({ note, sjUrl, receivingEnabled, qtyCap }) {
                                     </div>
                                     <button
                                         type="button"
-                                        className="rounded-md border border-line px-3 py-2 text-sm"
+                                        className="rounded-xl border border-line px-3 py-2 text-sm"
                                         onClick={() => setPartialOpen(false)}
                                     >
                                         Batal
                                     </button>
                                     <PrimaryButton
-                                        className="bg-emerald-700 hover:bg-emerald-800"
+                                        className="bg-emerald-600 hover:bg-emerald-700"
                                         disabled={receiveProcessing}
                                         onClick={() => submitReceive(receiveQty)}
                                     >

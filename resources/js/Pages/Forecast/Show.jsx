@@ -38,7 +38,7 @@ export default function Show({ forecast, fileUrl, canManage, isNextMonth }) {
                         {fileUrl && (
                             <a
                                 href={fileUrl}
-                                className="pressable rounded-md border border-line px-4 py-2.5 text-sm font-semibold text-ink-soft hover:border-brand-line"
+                                className="pressable rounded-xl border border-line px-4 py-2.5 text-sm font-semibold text-ink-soft hover:border-brand-line"
                             >
                                 Unduh File
                             </a>
@@ -47,13 +47,13 @@ export default function Show({ forecast, fileUrl, canManage, isNextMonth }) {
                             <>
                                 <Link
                                     href={route('forecasts.edit', forecast.id)}
-                                    className="pressable rounded-md border border-line px-4 py-2.5 text-sm font-semibold text-ink-soft"
+                                    className="pressable rounded-xl border border-line px-4 py-2.5 text-sm font-semibold text-ink-soft"
                                 >
                                     Perbarui
                                 </Link>
                                 <button
                                     type="button"
-                                    className="pressable rounded-md border border-rose-200 px-4 py-2.5 text-sm font-semibold text-rose-700"
+                                    className="pressable rounded-xl border border-rose-200 px-4 py-2.5 text-sm font-semibold text-rose-700"
                                     onClick={() => {
                                         if (confirm('Hapus forecast ini?')) {
                                             router.delete(route('forecasts.destroy', forecast.id));
@@ -87,7 +87,7 @@ export default function Show({ forecast, fileUrl, canManage, isNextMonth }) {
                         </div>
                     </dl>
                     {forecast.notes && (
-                        <p className="mt-4 rounded-lg bg-canvas-soft px-3 py-2 text-sm text-ink-soft">
+                        <p className="mt-4 rounded-xl bg-canvas-soft px-3 py-2 text-sm text-ink-soft">
                             {forecast.notes}
                         </p>
                     )}

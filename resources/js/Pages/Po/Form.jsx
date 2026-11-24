@@ -386,7 +386,7 @@ export default function Form({ order, qadSuppliers, qadSuppliersOhp, qadItems, i
                             <div className="md:col-span-2">
                                 <InputLabel value="Catatan" />
                                 <textarea
-                                    className="mt-1 w-full rounded-md border-line"
+                                    className="mt-1 w-full rounded-xl border-line"
                                     rows={2}
                                     value={data.notes}
                                     onChange={(e) => setData('notes', e.target.value)}
@@ -402,7 +402,7 @@ export default function Form({ order, qadSuppliers, qadSuppliersOhp, qadItems, i
                     {/* Section 1: Item + Qty */}
                     <div ref={itemSectionRef} className="ui-panel p-5 sm:p-6">
                         <div className="mb-1 flex items-center gap-2">
-                            <span className="inline-flex h-6 w-6 items-center justify-center rounded-md bg-brand text-xs font-bold text-white shadow-sm">
+                            <span className="inline-flex h-6 w-6 items-center justify-center rounded-xl bg-brand text-xs font-semibold text-white">
                                 1
                             </span>
                             <h3 className="font-display font-semibold text-ink">Item Order & Qty</h3>
@@ -416,7 +416,7 @@ export default function Form({ order, qadSuppliers, qadSuppliersOhp, qadItems, i
                             {data.items.map((item, itemIndex) => (
                                 <div
                                     key={itemIndex}
-                                    className="grid gap-3 rounded-lg border border-line bg-canvas-soft p-4 md:grid-cols-[1fr_140px_160px_auto]"
+                                    className="grid gap-3 rounded-xl border border-line bg-canvas-soft p-4 md:grid-cols-[1fr_140px_160px_auto]"
                                 >
                                     <div>
                                         <InputLabel value="Item Number" />
@@ -536,13 +536,13 @@ export default function Form({ order, qadSuppliers, qadSuppliersOhp, qadItems, i
                     <div className="ui-panel p-5 sm:p-6">
                         <div className="mb-1 flex flex-wrap items-center justify-between gap-3">
                             <div className="flex items-center gap-2">
-                                <span className="inline-flex h-6 w-6 items-center justify-center rounded-md bg-brand text-xs font-bold text-white shadow-sm">
+                                <span className="inline-flex h-6 w-6 items-center justify-center rounded-xl bg-brand text-xs font-semibold text-white">
                                     2
                                 </span>
                                 <h3 className="font-display font-semibold text-ink">Jadwal Pengiriman</h3>
                             </div>
                             {dueMonth && (
-                                <span className="rounded-md bg-brand-muted px-3 py-1 text-sm font-medium text-brand-deep">
+                                <span className="rounded-xl bg-brand-muted px-3 py-1 text-sm font-medium text-brand-deep">
                                     {monthTitle(dueMonth)} · tgl 1–{dueMonth.days}
                                 </span>
                             )}
@@ -553,7 +553,7 @@ export default function Form({ order, qadSuppliers, qadSuppliersOhp, qadItems, i
                         </p>
 
                         {hasMismatch && scheduleItems.length > 0 && dueMonth && (
-                            <div className="mb-5 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                            <div className="mb-5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
                                 <p className="font-medium">
                                     Qty jadwal belum cocok dengan qty order.
                                 </p>
@@ -577,17 +577,17 @@ export default function Form({ order, qadSuppliers, qadSuppliersOhp, qadItems, i
                         )}
 
                         {!dueMonth ? (
-                            <div className="rounded-lg border border-dashed border-line bg-canvas-soft px-4 py-8 text-center text-sm text-ink-muted">
+                            <div className="rounded-xl border border-dashed border-line bg-canvas-soft px-4 py-8 text-center text-sm text-ink-muted">
                                 Pilih due date di header PO terlebih dahulu. Bulan due date menentukan
                                 kolom tanggal (1–31).
                             </div>
                         ) : scheduleItems.length === 0 ? (
-                            <div className="rounded-lg border border-dashed border-line bg-canvas-soft px-4 py-8 text-center text-sm text-ink-muted">
+                            <div className="rounded-xl border border-dashed border-line bg-canvas-soft px-4 py-8 text-center text-sm text-ink-muted">
                                 Isi item dan qty di section 1 terlebih dahulu untuk mulai mengisi
                                 jadwal pengiriman.
                             </div>
                         ) : (
-                            <div className="-mx-2 overflow-x-auto rounded-lg border border-line">
+                            <div className="-mx-2 overflow-x-auto rounded-xl border border-line">
                                 <table className="min-w-full border-collapse text-sm">
                                     <thead>
                                         <tr className="bg-canvas text-ink-soft">
@@ -662,7 +662,7 @@ export default function Form({ order, qadSuppliers, qadSuppliersOhp, qadItems, i
                                                         className={`sticky left-[200px] z-10 w-[190px] min-w-[190px] max-w-[190px] border-b border-r border-line px-2 py-1.5 align-middle shadow-[2px_0_4px_-2px_rgba(0,0,0,0.06)] ${zebra}`}
                                                     >
                                                         <select
-                                                            className="w-full rounded-md border-line py-1.5 text-xs"
+                                                            className="w-full rounded-xl border-line py-1.5 text-xs"
                                                             value={ohpValue}
                                                             onChange={(e) =>
                                                                 setRowOhp(itemIndex, e.target.value)
@@ -766,7 +766,7 @@ export default function Form({ order, qadSuppliers, qadSuppliersOhp, qadItems, i
                     <div className="flex justify-end gap-3">
                         <Link
                             href={route('purchase-orders.index')}
-                            className="rounded-md border border-line px-4 py-2 text-sm"
+                            className="rounded-xl border border-line px-4 py-2 text-sm"
                         >
                             Batal
                         </Link>

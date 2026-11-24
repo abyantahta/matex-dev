@@ -60,7 +60,7 @@ export default function SearchableSelect({
         <div ref={rootRef} className={`relative ${className}`}>
             <button
                 type="button"
-                className="mt-1 flex w-full items-center justify-between rounded-md border border-line bg-surface px-3 py-2 text-left text-sm shadow-sm transition duration-220 ease-matex hover:border-brand-line focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand"
+                className="mt-1 flex w-full items-center justify-between rounded-lg border border-line bg-surface px-3 py-2 text-left text-sm transition duration-220 ease-matex hover:border-brand-line focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand"
                 onClick={() => {
                     setOpen((v) => !v);
                     setTimeout(() => inputRef.current?.focus(), 0);
@@ -79,12 +79,12 @@ export default function SearchableSelect({
             </button>
 
             {open && (
-                <div className="absolute z-30 mt-1 w-full overflow-hidden rounded-md border border-line bg-surface shadow-lg">
+                <div className="absolute z-30 mt-1 w-full overflow-hidden rounded-lg border border-line bg-surface shadow-lg">
                     <div className="border-b border-line p-2">
                         <input
                             ref={inputRef}
                             type="text"
-                            className="w-full rounded-md border-line text-sm"
+                            className="w-full rounded-lg border-line text-sm"
                             placeholder="Ketik untuk mencari..."
                             value={query}
                             onChange={(e) => setQuery(e.target.value)}

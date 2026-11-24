@@ -54,7 +54,7 @@ export default function Timeline({ logs = [] }) {
                             style={{ animationDelay: `${Math.min(index, 6) * 40}ms` }}
                         >
                             <span
-                                className={`absolute -start-1.5 mt-2 h-3 w-3 rounded-full border-2 border-surface shadow-sm ${
+                                className={`absolute -start-1.5 mt-2 h-3 w-3 rounded-full border-2 border-surface ${
                                     open ? 'bg-brand ring-2 ring-brand/30' : 'bg-brand'
                                 }`}
                             />

@@ -20,7 +20,7 @@ export default function Index({ notes, filters, scheduleStatuses }) {
 
             <div className="ui-page space-y-4">
                     <select
-                        className="rounded-md border-line text-sm"
+                        className="rounded-xl border-line text-sm"
                         value={filters.status || ''}
                         onChange={(e) =>
                             router.get(

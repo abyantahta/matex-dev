@@ -15,14 +15,32 @@ function ohpLabels(po) {
     ].join(', ');
 }
 
+const STAT_TONES = [
+    { card: 'bg-slate-50', chip: 'bg-white text-slate-500', text: 'text-slate-500' },
+    { card: 'bg-amber-50', chip: 'bg-white text-amber-600', text: 'text-amber-700' },
+    { card: 'bg-rose-50', chip: 'bg-white text-rose-500', text: 'text-rose-600' },
+    { card: 'bg-sky-50', chip: 'bg-white text-sky-600', text: 'text-sky-700' },
+    { card: 'bg-emerald-50', chip: 'bg-white text-emerald-600', text: 'text-emerald-700' },
+    { card: 'bg-violet-50', chip: 'bg-white text-violet-600', text: 'text-violet-700' },
+]
+
 function StatCard({ label, value, index = 0 }) {
+    const tone = STAT_TONES[index % STAT_TONES.length];
+
     return (
         <div
-            className="ui-panel ui-panel-interactive animate-fade-up p-5"
-            style={{ animationDelay: `${index * 50}ms` }}
+            className={`ui-panel ui-panel-interactive relative animate-fade-up overflow-hidden !border-white p-5 ${tone.card}`}
+            style={{ animationDelay: `${index * 60}ms` }}
         >
-            <p className="ui-eyebrow">{label}</p>
-            <p className="mt-3 font-display text-3xl font-bold tabular-nums text-ink">
+                        <div className="relative flex items-start justify-between gap-3">
+                <p className={`text-[0.6875rem] font-bold uppercase tracking-[0.12em] ${tone.text}`}>{label}</p>
+                <span className={`h-9 w-9 shrink-0 rounded-xl ${tone.chip}`}>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="m-2 h-5 w-5" aria-hidden="true">
+                        <path d="M4 19V9m6 10V5m6 14v-6m4 6H2" />
+                    </svg>
+                </span>
+            </div>
+            <p className="relative mt-4 font-display text-4xl font-extrabold tabular-nums text-ink">
                 {value ?? 0}
             </p>
         </div>
@@ -49,7 +67,7 @@ function ModeToggle({ mode, onChange }) {
                 }`}
             >
                 <span
-                    className={`absolute top-0.5 h-6 w-6 rounded-full bg-white shadow-sm transition duration-220 ease-matex ${
+                    className={`absolute top-0.5 h-6 w-6 rounded-full bg-white transition duration-220 ease-matex ${
                         isItem ? 'left-5' : 'left-0.5'
                     }`}
                 />
@@ -113,7 +131,7 @@ export default function Dashboard({
             <Head title="Dashboard" />
 
             <div className="ui-page space-y-6">
-                <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
                     {Object.entries(stats || {}).map(([key, value], index) => (
                         <StatCard
                             key={key}
@@ -215,13 +233,13 @@ export default function Dashboard({
                                 <input
                                     type="search"
                                     placeholder="Cari item number..."
-                                    className="rounded-md border-line text-sm"
+                                    className="rounded-xl border-line text-sm"
                                     value={searchDraft}
                                     onChange={(e) => setSearchDraft(e.target.value)}
                                 />
                                 <button
                                     type="submit"
-                                    className="pressable rounded-md bg-brand px-3 py-2 text-sm font-semibold text-white"
+                                    className="pressable rounded-xl bg-brand px-3 py-2 text-sm font-semibold text-white"
                                 >
                                     Cari
                                 </button>
@@ -267,7 +285,7 @@ export default function Dashboard({
                                                             <h4 className="font-display text-sm font-semibold text-ink">
                                                                 PO berjalan untuk {item.item_number}
                                                             </h4>
-                                                            <div className="mt-3 overflow-x-auto rounded-lg border border-line bg-surface">
+                                                            <div className="mt-3 overflow-x-auto rounded-xl border border-line bg-surface">
                                                                 <table className="min-w-full divide-y divide-line text-sm">
                                                                     <thead className="ui-table-head">
                                                                         <tr>
